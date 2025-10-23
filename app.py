@@ -1,13 +1,214 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from datetime import datetime
 import gspread
 
+# --- Page Configuration ---
+st.set_page_config(
+    page_title="Trading Performance Tracker",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# --- Custom CSS for Beautiful Styling ---
+st.markdown("""
+    <style>
+    /* Main background and theme */
+    .main {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background-attachment: fixed;
+    }
+    
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 20px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        margin: 1rem auto;
+    }
+    
+    /* Header styling */
+    h1 {
+        color: #1e3a8a;
+        font-weight: 800;
+        font-size: 3rem !important;
+        text-align: center;
+        margin-bottom: 2rem;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    h2, h3 {
+        color: #1e40af;
+        font-weight: 700;
+    }
+    
+    /* Sidebar styling */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #1e3a8a 0%, #3b82f6 100%);
+    }
+    
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
+        color: white;
+    }
+    
+    [data-testid="stSidebar"] h3 {
+        color: white !important;
+        font-weight: 700;
+        font-size: 1.5rem;
+    }
+    
+    /* Metric cards styling */
+    [data-testid="stMetricValue"] {
+        font-size: 2rem;
+        font-weight: 800;
+        color: white;
+    }
+    
+    [data-testid="stMetricLabel"] {
+        color: rgba(255, 255, 255, 0.9);
+        font-weight: 600;
+        font-size: 1rem;
+    }
+    
+    [data-testid="stMetricDelta"] {
+        color: #10b981;
+    }
+    
+    /* Tabs styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background-color: #f1f5f9;
+        border-radius: 10px;
+        padding: 0.5rem;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        background-color: white;
+        border-radius: 8px;
+        color: #1e40af;
+        font-weight: 600;
+        font-size: 1rem;
+        padding: 0 2rem;
+        transition: all 0.3s ease;
+    }
+    
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: #dbeafe;
+        transform: translateY(-2px);
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white !important;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    
+    /* Form styling */
+    .stForm {
+        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        border-radius: 15px;
+        padding: 2rem;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        border: 2px solid #3b82f6;
+    }
+    
+    /* Input fields */
+    .stTextInput input, .stNumberInput input, .stSelectbox select, .stDateInput input {
+        border-radius: 8px;
+        border: 2px solid #cbd5e1;
+        padding: 0.5rem;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .stTextInput input:focus, .stNumberInput input:focus, .stSelectbox select:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    /* Button styling */
+    .stButton button {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        color: white;
+        font-weight: 700;
+        font-size: 1.1rem;
+        padding: 0.75rem 2rem;
+        border-radius: 10px;
+        border: none;
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        transition: all 0.3s ease;
+        width: 100%;
+    }
+    
+    .stButton button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+    }
+    
+    /* Success/Error messages */
+    .stSuccess {
+        background-color: #d1fae5;
+        color: #065f46;
+        padding: 1rem;
+        border-radius: 10px;
+        border-left: 4px solid #10b981;
+    }
+    
+    .stError {
+        background-color: #fee2e2;
+        color: #991b1b;
+        padding: 1rem;
+        border-radius: 10px;
+        border-left: 4px solid #ef4444;
+    }
+    
+    /* Dataframe styling */
+    .dataframe {
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Chart containers */
+    .js-plotly-plot {
+        border-radius: 15px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        background: white;
+        padding: 1rem;
+    }
+    
+    /* Divider */
+    hr {
+        border: none;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+        margin: 2rem 0;
+    }
+    
+    /* Info/Warning boxes */
+    .stInfo {
+        background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+        border-left: 4px solid #3b82f6;
+        border-radius: 10px;
+        padding: 1rem;
+    }
+    
+    /* Toast notification style */
+    .stToast {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        border-radius: 10px;
+        font-weight: 600;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # --- Configuration and Setup ---
-# The secrets are loaded automatically by Streamlit from the cloud configuration
-# and your local .streamlit/secrets.toml file.
-# NOTE: Ensure you have your Google Sheet ID configured in st.secrets
 if "gsheets" not in st.secrets or "sheet_id" not in st.secrets["gsheets"]:
     st.error("Google Sheets configuration is missing. Please ensure 'gsheets.sheet_id' is set in your secrets.")
     SHEET_ID = None
@@ -22,8 +223,6 @@ def connect_gsheets():
     """Authenticates and returns a gspread client object."""
     if not SHEET_ID: return None
     try:
-        # Load credentials from st.secrets and authenticate gspread client
-        # The entire dict is passed to gspread.service_account_from_dict
         client = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
         return client
     except Exception as e:
@@ -41,7 +240,6 @@ def get_data_from_sheet(sheet_name):
         data = worksheet.get_all_records()
         df = pd.DataFrame(data)
         
-        # Ensure only non-empty rows are returned and handle potential empty columns
         df = df.dropna(how='all')
         
         return df
@@ -61,19 +259,15 @@ def write_data_to_sheet(sheet_name, df, mode='append'):
         spreadsheet = gc.open_by_key(SHEET_ID)
         worksheet = spreadsheet.worksheet(sheet_name)
         
-        # Prepare data: Convert DataFrame to a list of lists (excluding header for 'append')
         data_to_write = df.values.tolist()
         
         if mode == 'append':
-            # Append only the data rows (excluding header)
             worksheet.append_rows(data_to_write, value_input_option='USER_ENTERED')
             
         elif mode == 'replace':
-            # Clear the sheet and write the new DataFrame (including header)
             header = [str(col) for col in df.columns.tolist()]
             full_data = [header] + data_to_write
             
-            # OVERWRITE DATA using gspread's built-in method
             worksheet.clear()
             worksheet.update('A1', full_data, value_input_option='USER_ENTERED')
             
@@ -91,11 +285,9 @@ def recalculate_all_summaries(initial_balance=2283.22):
     """
     if not SHEET_ID: return pd.DataFrame()
 
-    # 1. Get raw trades and ensure correct data types
     df_trades = get_data_from_sheet('trades')
     
     if df_trades.empty or df_trades.shape[0] == 0:
-        # If no trades, create a starting summary row
         start_date = datetime.now().strftime("%Y-%m-%d")
         summary_data = {
             'Date': [start_date],
@@ -112,24 +304,20 @@ def recalculate_all_summaries(initial_balance=2283.22):
         return df_summary
 
     try:
-        # --- FIX: Use correct column names from the user's specification ---
-        # Ensure column names match the data written by the form: 'trade_date' and 'pnl'
         df_trades['trade_date'] = pd.to_datetime(df_trades['trade_date'], errors='coerce').dt.date.fillna(pd.NaT).ffill()
         df_trades['pnl'] = pd.to_numeric(df_trades['pnl'], errors='coerce').fillna(0)
     except Exception as e:
         st.error(f"Error processing trade data types: {e}. Check that your 'trades' sheet has columns 'trade_date' and 'pnl'.")
         return pd.DataFrame()
 
-    # 2. Sort by date and group by day
     df_trades = df_trades.sort_values(by='trade_date')
     daily_groups = df_trades.groupby('trade_date')
 
-    # 3. Calculate Daily Metrics
     daily_summary_list = []
     current_balance = initial_balance
     
     for date, group in daily_groups:
-        total_pl = group['pnl'].sum() # FIX: Corrected column name to 'pnl'
+        total_pl = group['pnl'].sum()
         num_trades = group.shape[0]
         
         start_balance = current_balance
@@ -139,17 +327,16 @@ def recalculate_all_summaries(initial_balance=2283.22):
         if start_balance <= 0:
              target_pl = 0
         
-        # FIX: Calculate week number using isocalendar().week
         week_num = datetime.combine(date, datetime.min.time()).isocalendar()[1]
              
         daily_summary_list.append({
             'Date': date.strftime("%Y-%m-%d"),
-            'Week': f'Wk {week_num}', # FIX: Updated week format
+            'Week': f'Wk {week_num}',
             'Trades': num_trades,
             'Start Bal.': round(start_balance, 2),
             'Target P&L': round(target_pl, 2),
             'Actual P&L': round(total_pl, 2),
-            'Deposit/Bonus': 0.00, # Will be merged from old summary later
+            'Deposit/Bonus': 0.00,
             'End Bal.': round(end_balance, 2),
         })
         current_balance = end_balance 
@@ -157,36 +344,25 @@ def recalculate_all_summaries(initial_balance=2283.22):
 
     df_summary = pd.DataFrame(daily_summary_list)
     
-    # 4. Handle Deposits/Bonuses
     df_old_summary = get_data_from_sheet('daily_summary')
     if not df_old_summary.empty:
-        # Ensure 'Date' columns are string dates for merging
         df_old_summary['Date'] = pd.to_datetime(df_old_summary['Date'], errors='coerce').dt.date.astype(str)
         df_summary['Date'] = pd.to_datetime(df_summary['Date'], errors='coerce').dt.date.astype(str)
         
-        # Merge the new summary with the old one to preserve Deposit/Bonus amounts
         df_merged = pd.merge(df_summary, df_old_summary[['Date', 'Deposit/Bonus']], on='Date', how='left', suffixes=('_new', '_old'))
         
-        # Clean and convert deposit column
         df_merged['Deposit/Bonus'] = pd.to_numeric(df_merged['Deposit/Bonus_old'], errors='coerce').fillna(0.00)
         
-        # Re-calculate End Bal. including the preserved deposit/bonus
-        # End Bal. is the Start Bal. from the trade day + P&L + Deposit/Bonus
-        # NOTE: df_summary already calculated the End Bal. based on trades (Start Bal + Actual P&L). 
-        # We just need to add the preserved Deposit/Bonus amount to that End Bal.
         df_merged['End Bal.'] = pd.to_numeric(df_merged['End Bal.'], errors='coerce').fillna(0) + df_merged['Deposit/Bonus']
         
-        # Final cleanup for the summary sheet columns
         df_summary = df_merged[['Date', 'Week', 'Trades', 'Start Bal.', 'Target P&L', 'Actual P&L', 'Deposit/Bonus', 'End Bal.']]
     else:
-        # Ensure 'Date' is a string if no old summary exists for merging
         df_summary['Date'] = df_summary['Date'].astype(str)
 
 
-    # 5. Write the final, recalculated summary back to the sheet
     if not df_summary.empty:
         write_data_to_sheet('daily_summary', df_summary, mode='replace')
-        st.toast("Daily summaries recalculated successfully.")
+        st.toast("✅ Daily summaries recalculated successfully!", icon="✅")
         
     return df_summary
 
@@ -197,10 +373,8 @@ def load_data():
     df_summary = get_data_from_sheet('daily_summary')
     df_trades = get_data_from_sheet('trades')
     
-    # Data Cleaning and Type Conversion for Charting/Display
     if not df_summary.empty:
         try:
-            # Summary columns
             if 'Date' in df_summary.columns:
                 df_summary['Date'] = pd.to_datetime(df_summary['Date'], errors='coerce')
             if 'End Bal.' in df_summary.columns:
@@ -213,15 +387,12 @@ def load_data():
 
     if not df_trades.empty:
         try:
-            # --- FIX: Use correct trade column names ---
             if 'trade_date' in df_trades.columns:
                 df_trades['trade_date'] = pd.to_datetime(df_trades['trade_date'], errors='coerce')
             if 'pnl' in df_trades.columns:
                 df_trades['pnl'] = pd.to_numeric(df_trades['pnl'], errors='coerce').fillna(0)
-            # Convert the new 'pnl_pct' column
             if 'pnl_pct' in df_trades.columns:
                 df_trades['pnl_pct'] = pd.to_numeric(df_trades['pnl_pct'], errors='coerce').fillna(0)
-            # Ensure other numeric columns are handled
             if 'leverage' in df_trades.columns:
                 df_trades['leverage'] = pd.to_numeric(df_trades['leverage'], errors='coerce').fillna(1.0)
             if 'investment' in df_trades.columns:
@@ -235,21 +406,17 @@ def load_data():
 
 # --- Initialize App and State ---
 
-# Set a default starting balance if not derived from data
 if 'initial_balance' not in st.session_state:
     st.session_state.initial_balance = 2272.22 
 
-# Load data on page load
 df_summary, df_trades = load_data()
 
-# Recalculate if the summary is critically empty but trades exist (to catch first-time use)
 if df_summary.empty and not df_trades.empty:
     recalculate_all_summaries(st.session_state.initial_balance)
-    df_summary, df_trades = load_data() # Reload data after recalculation
+    df_summary, df_trades = load_data()
 elif df_summary.empty and df_trades.empty:
-    # If both are empty, initialize a single summary row for display
     recalculate_all_summaries(st.session_state.initial_balance)
-    df_summary, df_trades = load_data() # Reload data after initialization
+    df_summary, df_trades = load_data()
 
 
 # --- Sidebar: Quick Stats ---
@@ -257,35 +424,29 @@ elif df_summary.empty and df_trades.empty:
 with st.sidebar:
     st.markdown("### 📊 Quick Stats")
     
-    # Current Balance
     current_balance = df_summary['End Bal.'].iloc[-1] if not df_summary.empty else st.session_state.initial_balance
     
-    # Initial balance must be calculated from the first 'Start Bal.' entry if summary exists
     if not df_summary.empty and 'Start Bal.' in df_summary.columns:
-        # Find the very first recorded starting balance (the true initial capital)
         first_start_bal = pd.to_numeric(df_summary['Start Bal.'], errors='coerce').iloc[0]
-        st.session_state.initial_balance = first_start_bal # Update session state with the true initial value
+        st.session_state.initial_balance = first_start_bal
     
     st.metric(
-        label="Current Balance",
+        label="💰 Current Balance",
         value=f"${current_balance:,.2f}",
         delta=f"${current_balance - st.session_state.initial_balance:,.2f}",
         delta_color="normal"
     )
 
-    # Total Trades
     total_trades = df_trades.shape[0] if not df_trades.empty else 0
-    st.metric(label="Total Trades", value=total_trades)
+    st.metric(label="🔄 Total Trades", value=total_trades)
     
-    # Current Week
     latest_week = df_summary['Week'].iloc[-1] if not df_summary.empty else 'Wk 1'
-    st.metric(label="Week", value=latest_week)
+    st.metric(label="📅 Current Week", value=latest_week)
 
-    # Total Trading P&L
     total_pl = df_summary['Actual P&L'].sum() if not df_summary.empty else 0.0
     total_pl_percent = (total_pl / st.session_state.initial_balance) * 100 if st.session_state.initial_balance > 0 else 0
     st.metric(
-        label="Total Trading P&L",
+        label="📈 Total Trading P&L",
         value=f"${total_pl:,.2f}",
         delta=f"{total_pl_percent:.2f}%",
         delta_color="normal"
@@ -293,15 +454,13 @@ with st.sidebar:
     
     st.divider()
     
-    # Form for adding deposits/bonuses
     with st.form("Deposit/Bonus Form"):
-        st.subheader("Add Deposit/Bonus")
+        st.subheader("💵 Add Deposit/Bonus")
         deposit_date = st.date_input("Date", datetime.now().date())
         deposit_amount = st.number_input("Amount ($)", min_value=0.01, step=10.00)
-        deposit_submitted = st.form_submit_button("Add Funds")
+        deposit_submitted = st.form_submit_button("Add Funds", use_container_width=True)
 
         if deposit_submitted:
-            # We must reload the summary data here to ensure we have the very latest version before modification
             df_summary_temp, _ = load_data()
             
             if df_summary_temp.empty:
@@ -309,13 +468,10 @@ with st.sidebar:
                  deposit_submitted = False
             
             if deposit_submitted:
-                # Find the row for the deposit date
                 deposit_date_str = deposit_date.strftime("%Y-%m-%d")
                 
-                # Convert the 'Date' column to string for consistent comparison
                 df_summary_temp['Date_str'] = df_summary_temp['Date'].astype(str).str[:10]
                 
-                # Check if an entry for this date already exists
                 target_index = df_summary_temp[df_summary_temp['Date_str'] == deposit_date_str].index
                 
                 if not target_index.empty:
@@ -325,66 +481,56 @@ with st.sidebar:
                     new_deposit = current_deposit + deposit_amount
                     df_summary_temp.loc[idx, 'Deposit/Bonus'] = round(new_deposit, 2)
                     
-                    # Drop the temporary date column
                     df_summary_temp = df_summary_temp.drop(columns=['Date_str'])
                     
-                    # Write back the updated summary sheet (dropping the Timestamp 'Date' column)
                     write_data_to_sheet('daily_summary', df_summary_temp.drop(columns=['Date'], errors='ignore'), mode='replace')
                     
-                    # Rerun summary calculation to update subsequent rows
                     recalculate_all_summaries(st.session_state.initial_balance)
                     
-                    # Clear cache and trigger reload
                     st.cache_resource.clear()
-                    # st.experimental_rerun()
                     st.rerun()
-
                 else:
                     st.error("Deposit date does not match any existing trade dates. Deposits can only be added on days where trading occurred.")
             
 
 # --- Main Page: Title and Tabs ---
-st.title("📈 Trading Performance Tracker")
+st.markdown("# 📈 Trading Performance Tracker")
 
 tab1, tab2, tab3 = st.tabs(["💵 Trade Entry", "🗓️ Daily Summary", "📊 Analytics"])
 
-# --- Tab 1: Trade Entry Form (Full User Spec) ---
+# --- Tab 1: Trade Entry Form ---
 with tab1:
     st.header("Log a New Trade")
     
     with st.form("Trade Entry Form"):
         
-        # Row 1: Trade Date, Ticker, Direction, Leverage
         col_1a, col_1b, col_1c, col_1d = st.columns(4)
         with col_1a:
-            trade_date = st.date_input("Trade Date", datetime.now().date())
+            trade_date = st.date_input("📅 Trade Date", datetime.now().date())
         with col_1b:
-            ticker = st.text_input("Ticker", help="e.g., GOOG, EURUSD")
+            ticker = st.text_input("🏷️ Ticker", help="e.g., GOOG, EURUSD")
         with col_1c:
-            direction = st.selectbox("Direction", ["Long", "Short", "Other"])
+            direction = st.selectbox("📊 Direction", ["Long", "Short", "Other"])
         with col_1d:
-            leverage = st.number_input("Leverage (x)", min_value=1.0, value=1.0, step=0.5)
+            leverage = st.number_input("⚡ Leverage (x)", min_value=1.0, value=1.0, step=0.5)
 
-        # Row 2: Investment, P&L ($), P&L (%)
         col_2a, col_2b, col_2c = st.columns(3)
         with col_2a:
-            investment = st.number_input("Investment ($)", min_value=0.01, value=1000.00, step=100.0, format="%.2f")
+            investment = st.number_input("💰 Investment ($)", min_value=0.01, value=1000.00, step=100.0, format="%.2f")
         with col_2b:
-            pnl = st.number_input("P&L ($)", help="Profit (+), Loss (-)", format="%.2f")
+            pnl = st.number_input("💵 P&L ($)", help="Profit (+), Loss (-)", format="%.2f")
         with col_2c:
-            pnl_pct = st.number_input("P&L %", help="e.g., 5.5 for 5.5%", format="%.2f")
+            pnl_pct = st.number_input("📊 P&L %", help="e.g., 5.5 for 5.5%", format="%.2f")
         
         st.markdown("---")
-        submitted = st.form_submit_button("Submit Trade", type="primary")
+        submitted = st.form_submit_button("✅ Submit Trade", type="primary", use_container_width=True)
 
         if submitted:
-            # Data validation
             if not ticker.strip():
-                st.error("Ticker cannot be empty.")
+                st.error("❌ Ticker cannot be empty.")
             elif investment <= 0:
-                st.error("Investment must be greater than zero.")
+                st.error("❌ Investment must be greater than zero.")
             else:
-                # Create a new row of data using the CORRECT column names
                 new_trade_data = pd.DataFrame([{
                     'trade_date': trade_date.strftime("%Y-%m-%d"),
                     'ticker': ticker.upper(),
@@ -395,20 +541,15 @@ with tab1:
                     'pnl_pct': pnl_pct,
                 }])
                 
-                # Write new trade to the 'trades' sheet
                 if write_data_to_sheet('trades', new_trade_data, mode='append'):
-                    st.success("Trade successfully logged!")
+                    st.success("✅ Trade successfully logged!")
                     
-                    # Recalculate all summaries and running balances
                     recalculate_all_summaries(st.session_state.initial_balance)
                     
-                    # Clear cache and trigger reload
                     st.cache_resource.clear()
-                    # st.experimental_rerun()
                     st.rerun()
-
                 else:
-                    st.error("Failed to log trade to Google Sheet.")
+                    st.error("❌ Failed to log trade to Google Sheet.")
 
 
 # --- Tab 2: Daily Summary ---
@@ -416,18 +557,15 @@ with tab2:
     st.header("Daily Summary")
     
     if df_summary.empty:
-        st.info("No summary data available. Enter trades or refresh the page after configuration.")
+        st.info("ℹ️ No summary data available. Enter trades or refresh the page after configuration.")
     else:
-        # Prepare data for display: ensure 'Date' is displayed nicely but use original for charts
         df_display = df_summary.copy()
         
-        # Format currency columns for display
         currency_cols = ['Start Bal.', 'Target P&L', 'Actual P&L', 'Deposit/Bonus', 'End Bal.']
         for col in currency_cols:
              if col in df_display.columns:
                 df_display[col] = pd.to_numeric(df_display[col], errors='coerce').apply(lambda x: f"${x:,.2f}" if pd.notna(x) else '$0.00')
 
-        # Drop columns that are not in the sheet if they accidentally crept in 
         cols_to_keep = ['Date', 'Week', 'Trades', 'Start Bal.', 'Target P&L', 'Actual P&L', 'Deposit/Bonus', 'End Bal.']
         df_display = df_display[[col for col in cols_to_keep if col in df_display.columns]]
             
@@ -437,23 +575,35 @@ with tab2:
             hide_index=True
         )
         
-        st.subheader("📉 Balance Progression")
+        st.subheader("📈 Balance Progression")
         
-        # Ensure chronological order for the chart
         df_chart = df_summary.sort_values(by='Date', ascending=True)
 
-        fig = px.line(
-            df_chart, 
-            x='Date',
-            y='End Bal.',
-            title='Balance Progression',
-            markers=True,
-            height=400
-        )
+        fig = go.Figure()
+        
+        fig.add_trace(go.Scatter(
+            x=df_chart['Date'],
+            y=df_chart['End Bal.'],
+            mode='lines+markers',
+            name='Balance',
+            line=dict(color='#3b82f6', width=3),
+            marker=dict(size=8, color='#1e40af', line=dict(color='white', width=2)),
+            fill='tozeroy',
+            fillcolor='rgba(59, 130, 246, 0.1)'
+        ))
+        
         fig.update_layout(
+            title='Balance Progression Over Time',
             xaxis_title="Date", 
             yaxis_title="Balance ($)",
-            hovermode='x unified'
+            hovermode='x unified',
+            height=450,
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(family="Arial, sans-serif", size=12, color="#1e3a8a"),
+            title_font=dict(size=20, color='#1e40af', family="Arial Black"),
+            xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.05)'),
+            yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.05)')
         )
         st.plotly_chart(fig, use_container_width=True)
 
@@ -462,45 +612,68 @@ with tab3:
     st.header("Performance Analytics")
     
     if df_trades.empty:
-        st.info("No trade data yet. Start logging trades to see analytics!")
+        st.info("ℹ️ No trade data yet. Start logging trades to see analytics!")
     else:
         
         col_pnl, col_winrate = st.columns(2)
         
         with col_pnl:
-            st.subheader("Daily P&L Chart")
+            st.subheader("💵 Daily P&L Chart")
             
-            # Use summary data for Daily P&L chart
             df_chart_pnl = df_summary.sort_values(by='Date', ascending=True)
             
-            fig_pnl = px.bar(
-                df_chart_pnl, 
-                x='Date',
-                y='Actual P&L',
+            colors = ['#10b981' if x > 0 else '#ef4444' for x in df_chart_pnl['Actual P&L']]
+            
+            fig_pnl = go.Figure()
+            
+            fig_pnl.add_trace(go.Bar(
+                x=df_chart_pnl['Date'],
+                y=df_chart_pnl['Actual P&L'],
+                marker_color=colors,
+                name='Daily P&L',
+                text=df_chart_pnl['Actual P&L'].apply(lambda x: f'${x:,.2f}'),
+                textposition='outside'
+            ))
+            
+            fig_pnl.update_layout(
                 title='Daily Trading Profit/Loss',
-                color='Actual P&L',
-                color_continuous_scale=px.colors.diverging.RdYlGn,
-                height=400
+                xaxis_title="Date", 
+                yaxis_title="P&L ($)",
+                height=450,
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(family="Arial, sans-serif", size=12, color="#1e3a8a"),
+                title_font=dict(size=18, color='#1e40af', family="Arial Black"),
+                xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.05)'),
+                yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.05)', zeroline=True, zerolinecolor='rgba(0,0,0,0.2)')
             )
-            fig_pnl.update_layout(xaxis_title="Date", yaxis_title="P&L ($)")
             st.plotly_chart(fig_pnl, use_container_width=True)
             
         with col_winrate:
-            st.subheader("Trade Win/Loss Breakdown")
+            st.subheader("🎯 Trade Win/Loss Breakdown")
             
-            # --- FIX: Use correct trade P&L column name 'pnl' ---
             df_trades_temp = df_trades.copy()
             df_trades_temp['Result'] = df_trades_temp['pnl'].apply(lambda x: 'Win' if x > 0 else ('Loss' if x < 0 else 'Breakeven'))
             
             result_counts = df_trades_temp['Result'].value_counts().reset_index()
             result_counts.columns = ['Result', 'Count']
             
-            fig_pie = px.pie(
-                result_counts, 
-                names='Result', 
-                values='Count',
+            fig_pie = go.Figure(data=[go.Pie(
+                labels=result_counts['Result'],
+                values=result_counts['Count'],
+                hole=0.4,
+                marker=dict(colors=['#10b981', '#ef4444', '#3b82f6']),
+                textfont=dict(size=16, color='white'),
+                textinfo='label+percent'
+            )])
+            
+            fig_pie.update_layout(
                 title='Total Trade Outcomes',
-                color_discrete_map={'Win': 'green', 'Loss': 'red', 'Breakeven': 'blue'},
-                height=400
+                height=450,
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(family="Arial, sans-serif", size=12, color="#1e3a8a"),
+                title_font=dict(size=18, color='#1e40af', family="Arial Black"),
+                showlegend=True
             )
             st.plotly_chart(fig_pie, use_container_width=True)
