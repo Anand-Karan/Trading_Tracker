@@ -656,45 +656,116 @@ with tab2:
             hide_index=True
         )
         
-        st.subheader("📈 Balance Progression")
+        # st.subheader("📈 Balance Progression")
         
+        # df_chart = df_summary.sort_values(by='Date', ascending=True)
+
+        # fig = go.Figure()
+        
+        # fig.add_trace(go.Scatter(
+        #     x=df_chart['Date'],
+        #     y=df_chart['End Bal.'],
+        #     mode='lines+markers',
+        #     name='Balance',
+        #     line=dict(color='#818cf8', width=3, shape='spline'),
+        #     marker=dict(size=8, color='#a78bfa', line=dict(color='#312e81', width=2)),
+        #     fill='tozeroy',
+        #     fillcolor='rgba(129, 140, 248, 0.2)'
+        # ))
+        
+        # fig.update_layout(
+        #     title='Balance Progression Over Time',
+        #     xaxis_title="Date", 
+        #     yaxis_title="Balance ($)",
+        #     hovermode='x unified',
+        #     height=450,
+        #     plot_bgcolor='rgba(30, 41, 59, 0.5)',
+        #     paper_bgcolor='rgba(0,0,0,0)',
+        #     font=dict(family="Inter, sans-serif", size=12, color="#e0e7ff"),
+        #     title_font=dict(size=20, color='#f8fafc', family="Inter"),
+        #     xaxis=dict(
+        #         showgrid=True, 
+        #         gridcolor='rgba(99, 102, 241, 0.1)',
+        #         tickfont=dict(color='#cbd5e1')
+        #     ),
+        #     yaxis=dict(
+        #         showgrid=True, 
+        #         gridcolor='rgba(99, 102, 241, 0.1)',
+        #         tickfont=dict(color='#cbd5e1')
+        #     )
+        # )
+        # st.plotly_chart(fig, use_container_width=True)
+
+        st.subheader("📊 Start vs End Balance per Day")
+
         df_chart = df_summary.sort_values(by='Date', ascending=True)
 
         fig = go.Figure()
-        
-        fig.add_trace(go.Scatter(
+
+        # --- Start Balance Bar ---
+        fig.add_trace(go.Bar(
+            x=df_chart['Date'],
+            y=df_chart['Start Bal.'],
+            name='Start Balance',
+            marker_color='#60a5fa',
+            text=df_chart['Start Bal.'].apply(lambda x: f"${x:,.0f}"),
+            textposition='outside'
+        ))
+
+        # --- End Balance Bar ---
+        fig.add_trace(go.Bar(
             x=df_chart['Date'],
             y=df_chart['End Bal.'],
-            mode='lines+markers',
-            name='Balance',
-            line=dict(color='#818cf8', width=3, shape='spline'),
-            marker=dict(size=8, color='#a78bfa', line=dict(color='#312e81', width=2)),
-            fill='tozeroy',
-            fillcolor='rgba(129, 140, 248, 0.2)'
+            name='End Balance',
+            marker_color='#a78bfa',
+            text=df_chart['End Bal.'].apply(lambda x: f"${x:,.0f}"),
+            textposition='outside'
         ))
-        
+
+        # --- Target P&L Line ---
+        if 'Target P&L' in df_chart.columns:
+            fig.add_trace(go.Scatter(
+                x=df_chart['Date'],
+                y=df_chart['Target P&L'],
+                mode='lines+markers',
+                name='Target P&L',
+                line=dict(color='#fbbf24', width=3, dash='dot'),
+                marker=dict(size=6, color='#fcd34d'),
+                yaxis='y2'
+            ))
+
         fig.update_layout(
-            title='Balance Progression Over Time',
-            xaxis_title="Date", 
-            yaxis_title="Balance ($)",
-            hovermode='x unified',
-            height=450,
+            barmode='group',
+            title='Start vs End Balance by Date (with Target P&L)',
+            xaxis_title='Date',
+            yaxis_title='Balance ($)',
+            height=480,
             plot_bgcolor='rgba(30, 41, 59, 0.5)',
             paper_bgcolor='rgba(0,0,0,0)',
             font=dict(family="Inter, sans-serif", size=12, color="#e0e7ff"),
-            title_font=dict(size=20, color='#f8fafc', family="Inter"),
-            xaxis=dict(
-                showgrid=True, 
-                gridcolor='rgba(99, 102, 241, 0.1)',
-                tickfont=dict(color='#cbd5e1')
+            title_font=dict(size=20, color='#f8fafc'),
+            legend=dict(
+                title=None,
+                orientation="h",
+                yanchor="bottom", y=1.02,
+                xanchor="center", x=0.5,
+                bgcolor='rgba(0,0,0,0)',
+                font=dict(color="#e0e7ff")
             ),
-            yaxis=dict(
-                showgrid=True, 
-                gridcolor='rgba(99, 102, 241, 0.1)',
-                tickfont=dict(color='#cbd5e1')
+            xaxis=dict(showgrid=True, gridcolor='rgba(99, 102, 241, 0.1)'),
+            yaxis=dict(showgrid=True, gridcolor='rgba(99, 102, 241, 0.1)'),
+            yaxis2=dict(
+                overlaying='y',
+                side='right',
+                showgrid=False,
+                title='Target P&L ($)',
+                titlefont=dict(color='#fcd34d'),
+                tickfont=dict(color='#fcd34d')
             )
         )
+
         st.plotly_chart(fig, use_container_width=True)
+
 
 # --- Tab 3: Performance Analytics ---
 with tab3:
