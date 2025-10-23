@@ -3,7 +3,6 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime
 import gspread
-from gspread_dataframe import set_with_dataframe, get_dataframe
 
 # --- Configuration and Setup ---
 # The secrets are loaded automatically by Streamlit from the cloud configuration
@@ -21,21 +20,20 @@ def connect_gsheets():
         client = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
         return client
     except Exception as e:
-        # This block was likely incomplete in your local file, causing the error.
         st.error(f"Error connecting to Google Sheets: {e}")
         return None
 
 def get_data_from_sheet(sheet_name):
-    """Retrieves data from a specific sheet as a pandas DataFrame."""
+    """Retrieves data from a specific sheet as a pandas DataFrame using core gspread."""
     gc = connect_gsheets()
     if not gc: return pd.DataFrame()
     try:
-        # Open the spreadsheet by its ID
         spreadsheet = gc.open_by_key(SHEET_ID)
         worksheet = spreadsheet.worksheet(sheet_name)
         
-        # Read all data into a DataFrame
-        df = get_dataframe(worksheet, evaluate_formulas=True)
+        # --- MANUAL DATA RETRIEVAL using gspread's built-in method ---
+        data = worksheet.get_all_records()
+        df = pd.DataFrame(data)
         
         # Ensure only non-empty rows are returned
         df = df.dropna(how='all')
@@ -50,20 +48,29 @@ def get_data_from_sheet(sheet_name):
 
 
 def write_data_to_sheet(sheet_name, df, mode='append'):
-    """Writes a DataFrame to a specific sheet (append or overwrite/replace)."""
+    """Writes a DataFrame to a specific sheet using core gspread."""
     gc = connect_gsheets()
     if not gc: return False
     try:
         spreadsheet = gc.open_by_key(SHEET_ID)
         worksheet = spreadsheet.worksheet(sheet_name)
         
+        # Prepare data: Convert DataFrame to a list of lists (including header for 'replace')
+        data_to_write = df.values.tolist()
+        
         if mode == 'append':
-            # Append the DataFrame to the existing data (ignoring header for append)
-            set_with_dataframe(worksheet, df, row=len(worksheet.get_all_values()) + 1, include_column_header=False, resize=True)
+            # Append only the data rows (excluding header)
+            worksheet.append_rows(data_to_write, value_input_option='USER_ENTERED')
+            
         elif mode == 'replace':
             # Clear the sheet and write the new DataFrame (including header)
+            header = [str(col) for col in df.columns.tolist()]
+            full_data = [header] + data_to_write
+            
+            # --- OVERWRITE DATA using gspread's built-in method ---
             worksheet.clear()
-            set_with_dataframe(worksheet, df, include_index=False, include_column_header=True, resize=True)
+            # Update the sheet starting from cell A1
+            worksheet.update('A1', full_data, value_input_option='USER_ENTERED')
             
         return True
     except Exception as e:
@@ -99,6 +106,7 @@ def recalculate_all_summaries(initial_balance=2283.22):
 
     try:
         # Convert necessary columns to correct types
+        # Note: We must ensure column names are correctly matched to those in the sheet (P&L, entry_date)
         df_trades['entry_date'] = pd.to_datetime(df_trades['entry_date']).dt.date
         df_trades['P&L'] = pd.to_numeric(df_trades['P&L'], errors='coerce').fillna(0)
     except Exception as e:
@@ -118,14 +126,14 @@ def recalculate_all_summaries(initial_balance=2283.22):
         total_pl = group['P&L'].sum()
         num_trades = group.shape[0]
         
-        # Pull any existing deposit/bonus for this date from the old summary (if it exists)
-        # For simplicity in this demo, we'll assume a dedicated 'deposits' sheet or a simple tracking mechanism 
-        # For now, we'll just track the running balance
-        
         start_balance = current_balance
         end_balance = start_balance + total_pl
         target_pl = start_balance * 0.065
         
+        # Check if the start balance is greater than 0 before calculating target P&L
+        if start_balance <= 0:
+             target_pl = 0
+             
         daily_summary_list.append({
             'Date': date.strftime("%Y-%m-%d"),
             'Week': week_counter, # Simplified week calculation
@@ -133,7 +141,7 @@ def recalculate_all_summaries(initial_balance=2283.22):
             'Start Bal.': round(start_balance, 2),
             'Target P&L': round(target_pl, 2),
             'Actual P&L': round(total_pl, 2),
-            'Deposit/Bonus': 0.00, # Handled separately in the Add Deposit/Bonus form
+            'Deposit/Bonus': 0.00, # Will be merged from old summary later
             'End Bal.': round(end_balance, 2),
         })
         current_balance = end_balance # Update running balance for the next day's starting balance
@@ -146,11 +154,13 @@ def recalculate_all_summaries(initial_balance=2283.22):
     # Since deposits/bonuses modify 'End Bal.' directly, we first read the existing summary
     df_old_summary = get_data_from_sheet('daily_summary')
     if not df_old_summary.empty:
-        df_old_summary['Date'] = pd.to_datetime(df_old_summary['Date']).dt.date
-        df_summary['Date'] = pd.to_datetime(df_summary['Date']).dt.date
+        df_old_summary['Date'] = pd.to_datetime(df_old_summary['Date'], errors='coerce').dt.date.astype(str)
+        df_summary['Date'] = pd.to_datetime(df_summary['Date'], errors='coerce').dt.date.astype(str)
         
         # Merge the new summary with the old one to preserve Deposit/Bonus amounts
         df_merged = pd.merge(df_summary, df_old_summary[['Date', 'Deposit/Bonus']], on='Date', how='left', suffixes=('_new', '_old'))
+        
+        # Ensure Deposit/Bonus is treated as numeric
         df_merged['Deposit/Bonus'] = pd.to_numeric(df_merged['Deposit/Bonus_old'], errors='coerce').fillna(0.00)
         
         # Re-calculate End Bal. including the preserved deposit/bonus
@@ -158,10 +168,16 @@ def recalculate_all_summaries(initial_balance=2283.22):
         
         # Final cleanup for the summary sheet columns
         df_summary = df_merged[['Date', 'Week', 'Trades', 'Start Bal.', 'Target P&L', 'Actual P&L', 'Deposit/Bonus', 'End Bal.']]
-        df_summary['Date'] = df_summary['Date'].dt.strftime("%Y-%m-%d") # Convert back to string for sheets
+    else:
+        # Ensure 'Date' is a string if no old summary exists for merging
+        df_summary['Date'] = df_summary['Date'].astype(str)
+
 
     # 5. Write the final, recalculated summary back to the sheet
     if not df_summary.empty:
+        # IMPORTANT: Convert the Date column back to YYYY-MM-DD string format for writing to Google Sheets
+        # Since we converted it to string for merging, this might be redundant but is safer.
+        df_summary['Date'] = df_summary['Date'].astype(str)
         write_data_to_sheet('daily_summary', df_summary, mode='replace')
         st.toast("Daily summaries recalculated successfully.")
         
@@ -177,17 +193,26 @@ def load_data():
     # Data Cleaning and Type Conversion for Charting/Display
     if not df_summary.empty:
         try:
-            df_summary['Date'] = pd.to_datetime(df_summary['Date'])
-            df_summary['End Bal.'] = pd.to_numeric(df_summary['End Bal.'], errors='coerce').fillna(0)
-            df_summary['Actual P&L'] = pd.to_numeric(df_summary['Actual P&L'], errors='coerce').fillna(0)
+            # Ensure proper columns exist before accessing
+            if 'Date' in df_summary.columns:
+                df_summary['Date'] = pd.to_datetime(df_summary['Date'], errors='coerce')
+            if 'End Bal.' in df_summary.columns:
+                df_summary['End Bal.'] = pd.to_numeric(df_summary['End Bal.'], errors='coerce').fillna(0)
+            if 'Actual P&L' in df_summary.columns:
+                df_summary['Actual P&L'] = pd.to_numeric(df_summary['Actual P&L'], errors='coerce').fillna(0)
         except Exception as e:
             st.warning(f"Could not convert summary data types: {e}")
             df_summary = pd.DataFrame()
 
     if not df_trades.empty:
         try:
-            df_trades['entry_date'] = pd.to_datetime(df_trades['entry_date'])
-            df_trades['P&L'] = pd.to_numeric(df_trades['P&L'], errors='coerce').fillna(0)
+            if 'entry_date' in df_trades.columns:
+                df_trades['entry_date'] = pd.to_datetime(df_trades['entry_date'], errors='coerce')
+            if 'P&L' in df_trades.columns:
+                df_trades['P&L'] = pd.to_numeric(df_trades['P&L'], errors='coerce').fillna(0)
+            # Convert the new 'P&L %' column
+            if 'P&L %' in df_trades.columns:
+                df_trades['P&L %'] = pd.to_numeric(df_trades['P&L %'], errors='coerce').fillna(0)
         except Exception as e:
             st.warning(f"Could not convert trades data types: {e}")
             df_trades = pd.DataFrame()
@@ -198,7 +223,8 @@ def load_data():
 
 # Run initial calculation if data is empty or missing (especially on first run)
 if 'initial_balance' not in st.session_state:
-    st.session_state.initial_balance = 2272.22 # Using the starting balance from your screenshot
+    # Set a default starting balance if not derived from data
+    st.session_state.initial_balance = 2272.22 
 
 # Load data on page load
 df_summary, df_trades = load_data()
@@ -207,6 +233,11 @@ df_summary, df_trades = load_data()
 if df_summary.empty and not df_trades.empty:
     recalculate_all_summaries(st.session_state.initial_balance)
     df_summary, df_trades = load_data() # Reload data after recalculation
+elif df_summary.empty and df_trades.empty:
+    # If both are empty, initialize a single summary row for display
+    recalculate_all_summaries(st.session_state.initial_balance)
+    df_summary, df_trades = load_data() # Reload data after initialization
+
 
 # --- Sidebar: Quick Stats ---
 
@@ -215,6 +246,13 @@ with st.sidebar:
     
     # Current Balance
     current_balance = df_summary['End Bal.'].iloc[-1] if not df_summary.empty else st.session_state.initial_balance
+    
+    # Initial balance must be calculated from the first 'Start Bal.' entry if summary exists
+    if not df_summary.empty and 'Start Bal.' in df_summary.columns:
+        # Find the very first recorded starting balance (the true initial capital)
+        first_start_bal = pd.to_numeric(df_summary['Start Bal.'], errors='coerce').iloc[0]
+        st.session_state.initial_balance = first_start_bal # Update session state with the true initial value
+    
     st.metric(
         label="Current Balance",
         value=f"${current_balance:,.2f}",
@@ -250,49 +288,55 @@ with st.sidebar:
         deposit_submitted = st.form_submit_button("Add Funds")
 
         if deposit_submitted:
-            if df_summary.empty:
-                 # This should rarely happen but handles edge case if no summary exists
-                recalculate_all_summaries(st.session_state.initial_balance)
-                df_summary, _ = load_data() 
-                
-            # Find the row for the deposit date
-            deposit_date_str = deposit_date.strftime("%Y-%m-%d")
+            # We must reload the summary data here to ensure we have the very latest version before modification
+            df_summary_temp, _ = load_data()
             
-            # Find the row index to update
-            df_summary_temp = df_summary.copy()
-            df_summary_temp['Date'] = df_summary_temp['Date'].astype(str) # Match string format
+            if df_summary_temp.empty:
+                 st.error("Cannot add deposit as the daily summary sheet is empty.")
+                 deposit_submitted = False # Prevent further execution
             
-            # Check if an entry for this date already exists
-            target_index = df_summary_temp[df_summary_temp['Date'] == deposit_date_str].index
-            
-            if not target_index.empty:
-                # Update existing row
-                idx = target_index[0]
+            if deposit_submitted:
+                # Find the row for the deposit date
+                deposit_date_str = deposit_date.strftime("%Y-%m-%d")
                 
-                # Check current deposit value (needs to be numeric)
-                current_deposit = pd.to_numeric(df_summary_temp.loc[idx, 'Deposit/Bonus'], errors='coerce').fillna(0)
+                # Convert the 'Date' column to string for consistent comparison
+                df_summary_temp['Date_str'] = df_summary_temp['Date'].astype(str).str[:10] # ensure YYYY-MM-DD format
                 
-                # Add new amount to existing deposit
-                new_deposit = current_deposit + deposit_amount
-                df_summary_temp.loc[idx, 'Deposit/Bonus'] = round(new_deposit, 2)
+                # Check if an entry for this date already exists
+                target_index = df_summary_temp[df_summary_temp['Date_str'] == deposit_date_str].index
                 
-                # Update End Bal.: End Bal = Start Bal + P&L + New Deposit
-                start_bal = pd.to_numeric(df_summary_temp.loc[idx, 'Start Bal.'], errors='coerce').fillna(0)
-                actual_pl = pd.to_numeric(df_summary_temp.loc[idx, 'Actual P&L'], errors='coerce').fillna(0)
-                df_summary_temp.loc[idx, 'End Bal.'] = round(start_bal + actual_pl + new_deposit, 2)
-                
-                # Write back the updated summary sheet
-                write_data_to_sheet('daily_summary', df_summary_temp, mode='replace')
-                
-                # Rerun summary calculation to update subsequent rows if any
-                recalculate_all_summaries(st.session_state.initial_balance)
-                
-                # Clear cache and trigger reload
-                st.cache_resource.clear()
-                st.experimental_rerun()
-            else:
-                st.error("Cannot add deposit to a date without a corresponding trade entry.")
-                
+                if not target_index.empty:
+                    # Update existing row
+                    idx = target_index[0]
+                    
+                    # Check current deposit value (needs to be numeric)
+                    current_deposit = pd.to_numeric(df_summary_temp.loc[idx, 'Deposit/Bonus'], errors='coerce').fillna(0)
+                    
+                    # Add new amount to existing deposit
+                    new_deposit = current_deposit + deposit_amount
+                    df_summary_temp.loc[idx, 'Deposit/Bonus'] = round(new_deposit, 2)
+                    
+                    # Update End Bal.: End Bal = Start Bal + P&L + New Deposit
+                    start_bal = pd.to_numeric(df_summary_temp.loc[idx, 'Start Bal.'], errors='coerce').fillna(0)
+                    actual_pl = pd.to_numeric(df_summary_temp.loc[idx, 'Actual P&L'], errors='coerce').fillna(0)
+                    df_summary_temp.loc[idx, 'End Bal.'] = round(start_bal + actual_pl + new_deposit, 2)
+                    
+                    # Drop the temporary date column
+                    df_summary_temp = df_summary_temp.drop(columns=['Date_str'])
+                    
+                    # Write back the updated summary sheet
+                    # Note: Dropping the original 'Date' column which is a Timestamp for writing, 
+                    # relying on the string version from merge being preserved and used.
+                    write_data_to_sheet('daily_summary', df_summary_temp.drop(columns=['Date'], errors='ignore'), mode='replace')
+                    
+                    # Rerun summary calculation to update subsequent rows
+                    recalculate_all_summaries(st.session_state.initial_balance)
+                    
+                    # Clear cache and trigger reload
+                    st.cache_resource.clear()
+                    st.experimental_rerun()
+                else:
+                    st.error("Cannot add deposit to a date without a corresponding trade entry.")
             
 
 # --- Main Page: Title and Tabs ---
@@ -300,25 +344,23 @@ st.title("📈 Trading Performance Tracker")
 
 tab1, tab2, tab3 = st.tabs(["💵 Trade Entry", "🗓️ Daily Summary", "📊 Analytics"])
 
-# --- Tab 1: Trade Entry Form ---
+# --- Tab 1: Trade Entry Form (Simplified) ---
 with tab1:
     st.header("Log a New Trade")
     
     with st.form("Trade Entry Form"):
-        # Trade Details
-        col_1, col_2 = st.columns(2)
+        # Trade Details - Simplified to just the required core data
+        col_1, col_2, col_3 = st.columns(3) # Use three columns for better layout
         with col_1:
             trade_type = st.selectbox("Type", ["Long", "Short"])
-            entry_price = st.number_input("Entry Price", min_value=0.01, format="%.2f")
-            stop_loss = st.number_input("Stop Loss", min_value=0.01, format="%.2f")
-            pnl = st.number_input("P&L ($)", help="Enter profit as positive, loss as negative.")
-        with col_2:
             market = st.selectbox("Market", ["Stock", "Forex", "Crypto", "Futures"])
-            exit_price = st.number_input("Exit Price", min_value=0.01, format="%.2f")
-            target_price = st.number_input("Target Price", min_value=0.01, format="%.2f")
+        with col_2:
             trade_date = st.date_input("Entry Date", datetime.now().date())
-        
-        notes = st.text_area("Notes")
+            pnl = st.number_input("P&L ($)", help="Enter profit as positive, loss as negative.", format="%.2f")
+        with col_3:
+            # New field for P&L %
+            st.markdown(" ") # Spacer for alignment
+            pnl_percent = st.number_input("P&L %", help="Enter percentage (e.g., 2.5 for 2.5%)", format="%.2f")
         
         submitted = st.form_submit_button("Submit Trade")
 
@@ -328,12 +370,8 @@ with tab1:
                 'entry_date': trade_date.strftime("%Y-%m-%d"),
                 'trade_type': trade_type,
                 'market': market,
-                'entry_price': entry_price,
-                'exit_price': exit_price,
-                'stop_loss': stop_loss,
-                'target_price': target_price,
                 'P&L': pnl,
-                'notes': notes,
+                'P&L %': pnl_percent, # Log the new P&L %
             }])
             
             # Write new trade to the 'trades' sheet
@@ -343,7 +381,7 @@ with tab1:
                 # Recalculate all summaries and running balances
                 recalculate_all_summaries(st.session_state.initial_balance)
                 
-                # Clear cache and trigger reload to update stats
+                # Clear cache and trigger reload
                 st.cache_resource.clear()
                 st.experimental_rerun()
             else:
@@ -363,7 +401,12 @@ with tab2:
         # Format currency columns for display
         currency_cols = ['Start Bal.', 'Target P&L', 'Actual P&L', 'Deposit/Bonus', 'End Bal.']
         for col in currency_cols:
-            df_display[col] = df_display[col].apply(lambda x: f"${x:,.2f}")
+             if col in df_display.columns:
+                df_display[col] = pd.to_numeric(df_display[col], errors='coerce').apply(lambda x: f"${x:,.2f}" if pd.notna(x) else '$0.00')
+
+        # Drop columns that are not in the sheet if they accidentally crept in (like a temporary 'Date_str')
+        cols_to_keep = ['Date', 'Week', 'Trades', 'Start Bal.', 'Target P&L', 'Actual P&L', 'Deposit/Bonus', 'End Bal.']
+        df_display = df_display[[col for col in cols_to_keep if col in df_display.columns]]
             
         st.dataframe(
             df_display.sort_values(by='Date', ascending=False), 
