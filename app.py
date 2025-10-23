@@ -509,6 +509,60 @@ with st.sidebar:
     
     st.divider()
     
+    # Reset App Section
+    st.markdown("### ⚠️ Danger Zone")
+    with st.expander("🗑️ Reset All Data", expanded=False):
+        st.warning("⚠️ This will permanently delete ALL trades and summaries. This action cannot be undone!")
+        
+        reset_confirmation = st.text_input(
+            "Type 'DELETE' to confirm:",
+            key="reset_confirm",
+            help="Type DELETE in capital letters to enable the reset button"
+        )
+        
+        reset_button = st.button(
+            "🗑️ Reset App & Delete All Data",
+            type="secondary",
+            disabled=(reset_confirmation != "DELETE"),
+            use_container_width=True
+        )
+        
+        if reset_button and reset_confirmation == "DELETE":
+            try:
+                gc = connect_gsheets()
+                if gc:
+                    spreadsheet = gc.open_by_key(SHEET_ID)
+                    
+                    # Clear trades sheet
+                    trades_sheet = spreadsheet.worksheet('trades')
+                    trades_sheet.clear()
+                    # Add headers back
+                    trades_sheet.update('A1', [['trade_date', 'ticker', 'leverage', 'direction', 'investment', 'pnl', 'pnl_pct']])
+                    
+                    # Clear daily summary sheet
+                    summary_sheet = spreadsheet.worksheet('daily_summary')
+                    summary_sheet.clear()
+                    # Add headers back
+                    summary_sheet.update('A1', [['Date', 'Week', 'Trades', 'Start Bal.', 'Target P&L', 'Actual P&L', 'Deposit/Bonus', 'End Bal.']])
+                    
+                    # Clear all caches
+                    st.cache_data.clear()
+                    st.cache_resource.clear()
+                    
+                    st.success("✅ All data has been deleted successfully!")
+                    st.balloons()
+                    
+                    # Wait a moment then rerun
+                    import time
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.error("❌ Failed to connect to Google Sheets")
+            except Exception as e:
+                st.error(f"❌ Error resetting app: {e}")
+    
+    st.divider()
+    
     with st.form("Deposit/Bonus Form"):
         st.subheader("💵 Add Deposit/Bonus")
         deposit_date = st.date_input("Date", datetime.now().date())
