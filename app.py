@@ -560,59 +560,6 @@ with st.sidebar:
                     st.error("❌ Failed to connect to Google Sheets")
             except Exception as e:
                 st.error(f"❌ Error resetting app: {e}")
-    
-    st.divider()
-    
-    with st.form("Deposit/Bonus Form"):
-        st.subheader("💵 Add Deposit/Bonus")
-        deposit_date = st.date_input("Date", datetime.now().date())
-        deposit_amount = st.number_input("Amount ($)", min_value=0.01, step=10.00)
-        deposit_submitted = st.form_submit_button("Add Funds", use_container_width=True)
-
-        if deposit_submitted:
-            df_summary_temp, _ = load_data()
-            
-            if df_summary_temp.empty:
-                 st.error("Cannot add deposit as the daily summary sheet is empty.")
-            else:
-                deposit_date_str = deposit_date.strftime("%Y-%m-%d")
-                
-                # Convert Date column to string for comparison
-                df_summary_temp['Date_str'] = pd.to_datetime(df_summary_temp['Date'], errors='coerce').dt.strftime('%Y-%m-%d')
-                
-                target_index = df_summary_temp[df_summary_temp['Date_str'] == deposit_date_str].index
-                
-                if not target_index.empty:
-                    idx = target_index[0]
-                    
-                    # Get current deposit value, handle both string and numeric types
-                    current_deposit_val = df_summary_temp.loc[idx, 'Deposit/Bonus']
-                    if pd.isna(current_deposit_val) or current_deposit_val == '':
-                        current_deposit = 0.0
-                    else:
-                        # Remove dollar sign and commas if present
-                        if isinstance(current_deposit_val, str):
-                            current_deposit_val = current_deposit_val.replace('$', '').replace(',', '')
-                        current_deposit = pd.to_numeric(current_deposit_val, errors='coerce')
-                        if pd.isna(current_deposit):
-                            current_deposit = 0.0
-                    
-                    new_deposit = current_deposit + deposit_amount
-                    df_summary_temp.loc[idx, 'Deposit/Bonus'] = round(new_deposit, 2)
-                    
-                    # Drop temporary column
-                    df_summary_temp = df_summary_temp.drop(columns=['Date_str'], errors='ignore')
-                    
-                    # Write back to sheet
-                    write_data_to_sheet('daily_summary', df_summary_temp.drop(columns=['Date'], errors='ignore'), mode='replace')
-                    
-                    # Recalculate summaries
-                    recalculate_all_summaries(st.session_state.initial_balance)
-                    
-                    st.cache_data.clear()
-                    st.rerun()
-                else:
-                    st.error("❌ Deposit date does not match any existing trade dates. Deposits can only be added on days where trading occurred.")
             
 
 # --- Main Page: Title and Tabs ---
@@ -684,18 +631,21 @@ with tab2:
     else:
         df_display = df_summary.copy()
         
-        # Sort FIRST before formatting
-        df_display = df_display.sort_values(by='Date', ascending=False)
+        # Ensure Date column exists and is datetime
+        if 'Date' in df_display.columns:
+            df_display['Date'] = pd.to_datetime(df_display['Date'], errors='coerce')
+            
+            # Sort by Date
+            df_display = df_display.sort_values(by='Date', ascending=False)
+            
+            # Format date for display
+            df_display['Date'] = df_display['Date'].dt.strftime('%Y-%m-%d')
         
-        # Then format currency columns
+        # Format currency columns
         currency_cols = ['Start Bal.', 'Target P&L', 'Actual P&L', 'Deposit/Bonus', 'End Bal.']
         for col in currency_cols:
              if col in df_display.columns:
                 df_display[col] = pd.to_numeric(df_display[col], errors='coerce').apply(lambda x: f"${x:,.2f}" if pd.notna(x) else '$0.00')
-
-        # Format date column for display
-        if 'Date' in df_display.columns:
-            df_display['Date'] = df_display['Date'].dt.strftime('%Y-%m-%d')
 
         cols_to_keep = ['Date', 'Week', 'Trades', 'Start Bal.', 'Target P&L', 'Actual P&L', 'Deposit/Bonus', 'End Bal.']
         df_display = df_display[[col for col in cols_to_keep if col in df_display.columns]]
@@ -829,4 +779,3 @@ with tab3:
                 legend=dict(font=dict(color='#e0e7ff'))
             )
             st.plotly_chart(fig_pie, use_container_width=True)
-            #s
