@@ -336,7 +336,9 @@ with st.sidebar:
                     
                     # Clear cache and trigger reload
                     st.cache_resource.clear()
-                    st.experimental_rerun()
+                    # st.experimental_rerun()
+                    st.rerun()
+
                 else:
                     st.error("Deposit date does not match any existing trade dates. Deposits can only be added on days where trading occurred.")
             
@@ -402,7 +404,9 @@ with tab1:
                     
                     # Clear cache and trigger reload
                     st.cache_resource.clear()
-                    st.experimental_rerun()
+                    # st.experimental_rerun()
+                    st.rerun()
+
                 else:
                     st.error("Failed to log trade to Google Sheet.")
 
