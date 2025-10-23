@@ -13,189 +13,221 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- Custom CSS for Beautiful Styling ---
+# --- Custom CSS for Beautiful Dark Styling ---
 st.markdown("""
     <style>
+    /* Import Google Fonts */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+    
     /* Main background and theme */
     .main {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%);
         background-attachment: fixed;
+        font-family: 'Inter', sans-serif;
     }
     
     .block-container {
         padding-top: 2rem;
         padding-bottom: 2rem;
-        background: rgba(255, 255, 255, 0.95);
+        background: rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(10px);
         border-radius: 20px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        border: 1px solid rgba(99, 102, 241, 0.2);
         margin: 1rem auto;
     }
     
     /* Header styling */
     h1 {
-        color: #1e3a8a;
+        color: #f8fafc;
         font-weight: 800;
         font-size: 3rem !important;
         text-align: center;
         margin-bottom: 2rem;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        text-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
+        background: linear-gradient(135deg, #818cf8, #c084fc, #f472b6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
     }
     
     h2, h3 {
-        color: #1e40af;
+        color: #e0e7ff;
         font-weight: 700;
     }
     
     /* Sidebar styling */
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #1e3a8a 0%, #3b82f6 100%);
+        background: linear-gradient(180deg, #1e1b4b 0%, #312e81 100%);
+        border-right: 1px solid rgba(99, 102, 241, 0.3);
     }
     
     [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
-        color: white;
+        color: #e0e7ff;
     }
     
     [data-testid="stSidebar"] h3 {
-        color: white !important;
+        color: #f8fafc !important;
         font-weight: 700;
         font-size: 1.5rem;
+        text-shadow: 0 0 10px rgba(139, 92, 246, 0.5);
     }
     
     /* Metric cards styling */
     [data-testid="stMetricValue"] {
         font-size: 2rem;
         font-weight: 800;
-        color: white;
+        color: #f8fafc;
+        text-shadow: 0 0 10px rgba(139, 92, 246, 0.3);
     }
     
     [data-testid="stMetricLabel"] {
-        color: rgba(255, 255, 255, 0.9);
+        color: rgba(226, 232, 240, 0.9);
         font-weight: 600;
         font-size: 1rem;
     }
     
     [data-testid="stMetricDelta"] {
-        color: #10b981;
+        color: #34d399;
     }
     
     /* Tabs styling */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
-        background-color: #f1f5f9;
+        background-color: rgba(30, 27, 75, 0.8);
         border-radius: 10px;
         padding: 0.5rem;
+        border: 1px solid rgba(99, 102, 241, 0.2);
     }
     
     .stTabs [data-baseweb="tab"] {
         height: 50px;
-        background-color: white;
+        background-color: rgba(51, 65, 85, 0.6);
         border-radius: 8px;
-        color: #1e40af;
+        color: #cbd5e1;
         font-weight: 600;
         font-size: 1rem;
         padding: 0 2rem;
         transition: all 0.3s ease;
+        border: 1px solid transparent;
     }
     
     .stTabs [data-baseweb="tab"]:hover {
-        background-color: #dbeafe;
+        background-color: rgba(79, 70, 229, 0.3);
+        border-color: rgba(139, 92, 246, 0.5);
         transform: translateY(-2px);
     }
     
     .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
         color: white !important;
-        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        box-shadow: 0 4px 20px rgba(139, 92, 246, 0.6);
+        border-color: rgba(139, 92, 246, 0.8);
     }
     
     /* Form styling */
     .stForm {
-        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        background: linear-gradient(135deg, rgba(30, 27, 75, 0.8) 0%, rgba(49, 46, 129, 0.8) 100%);
         border-radius: 15px;
         padding: 2rem;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-        border: 2px solid #3b82f6;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+        border: 2px solid rgba(139, 92, 246, 0.3);
+        backdrop-filter: blur(10px);
     }
     
     /* Input fields */
     .stTextInput input, .stNumberInput input, .stSelectbox select, .stDateInput input {
+        background-color: rgba(30, 41, 59, 0.9) !important;
+        color: #e0e7ff !important;
         border-radius: 8px;
-        border: 2px solid #cbd5e1;
+        border: 2px solid rgba(99, 102, 241, 0.3) !important;
         padding: 0.5rem;
         font-size: 1rem;
         transition: all 0.3s ease;
     }
     
     .stTextInput input:focus, .stNumberInput input:focus, .stSelectbox select:focus {
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        border-color: #8b5cf6 !important;
+        box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2) !important;
+        background-color: rgba(30, 41, 59, 1) !important;
+    }
+    
+    .stTextInput label, .stNumberInput label, .stSelectbox label, .stDateInput label {
+        color: #cbd5e1 !important;
+        font-weight: 600;
     }
     
     /* Button styling */
     .stButton button {
-        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        background: linear-gradient(135deg, #f43f5e 0%, #dc2626 100%);
         color: white;
         font-weight: 700;
         font-size: 1.1rem;
         padding: 0.75rem 2rem;
         border-radius: 10px;
         border: none;
-        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        box-shadow: 0 4px 20px rgba(244, 63, 94, 0.5);
         transition: all 0.3s ease;
         width: 100%;
     }
     
     .stButton button:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+        box-shadow: 0 6px 30px rgba(244, 63, 94, 0.7);
     }
     
     /* Success/Error messages */
     .stSuccess {
-        background-color: #d1fae5;
-        color: #065f46;
+        background-color: rgba(16, 185, 129, 0.2);
+        color: #6ee7b7;
         padding: 1rem;
         border-radius: 10px;
         border-left: 4px solid #10b981;
+        backdrop-filter: blur(10px);
     }
     
     .stError {
-        background-color: #fee2e2;
-        color: #991b1b;
+        background-color: rgba(239, 68, 68, 0.2);
+        color: #fca5a5;
         padding: 1rem;
         border-radius: 10px;
         border-left: 4px solid #ef4444;
+        backdrop-filter: blur(10px);
     }
     
     /* Dataframe styling */
     .dataframe {
         border-radius: 10px;
         overflow: hidden;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        background-color: rgba(30, 41, 59, 0.8) !important;
     }
     
     /* Chart containers */
     .js-plotly-plot {
         border-radius: 15px;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-        background: white;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+        background: rgba(30, 41, 59, 0.8);
         padding: 1rem;
+        border: 1px solid rgba(99, 102, 241, 0.2);
     }
     
     /* Divider */
     hr {
         border: none;
         height: 2px;
-        background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+        background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.6), transparent);
         margin: 2rem 0;
     }
     
     /* Info/Warning boxes */
     .stInfo {
-        background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
-        border-left: 4px solid #3b82f6;
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%);
+        border-left: 4px solid #6366f1;
         border-radius: 10px;
         padding: 1rem;
+        color: #cbd5e1;
+        backdrop-filter: blur(10px);
     }
     
     /* Toast notification style */
@@ -204,6 +236,25 @@ st.markdown("""
         color: white;
         border-radius: 10px;
         font-weight: 600;
+    }
+    
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: rgba(30, 41, 59, 0.5);
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        border-radius: 5px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(135deg, #8b5cf6, #a78bfa);
     }
     </style>
 """, unsafe_allow_html=True)
