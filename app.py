@@ -516,32 +516,25 @@ with st.sidebar:
             
             if df_summary_temp.empty:
                  st.error("Cannot add deposit as the daily summary sheet is empty.")
-                 deposit_submitted = False
-            
-            if deposit_submitted:
+            else:
                 deposit_date_str = deposit_date.strftime("%Y-%m-%d")
                 
-                df_summary_temp['Date_str'] = df_summary_temp['Date'].astype(str).str[:10]
+                # Convert Date column to string for comparison
+                df_summary_temp['Date_str'] = pd.to_datetime(df_summary_temp['Date'], errors='coerce').dt.strftime('%Y-%m-%d')
                 
                 target_index = df_summary_temp[df_summary_temp['Date_str'] == deposit_date_str].index
                 
                 if not target_index.empty:
                     idx = target_index[0]
                     
-                    current_deposit = pd.to_numeric(df_summary_temp.loc[idx, 'Deposit/Bonus'], errors='coerce').fillna(0)
-                    new_deposit = current_deposit + deposit_amount
-                    df_summary_temp.loc[idx, 'Deposit/Bonus'] = round(new_deposit, 2)
-                    
-                    df_summary_temp = df_summary_temp.drop(columns=['Date_str'])
-                    
-                    write_data_to_sheet('daily_summary', df_summary_temp.drop(columns=['Date'], errors='ignore'), mode='replace')
-                    
-                    recalculate_all_summaries(st.session_state.initial_balance)
-                    
-                    st.cache_resource.clear()
-                    st.rerun()
-                else:
-                    st.error("Deposit date does not match any existing trade dates. Deposits can only be added on days where trading occurred.")
+                    # Get current deposit value, handle both string and numeric types
+                    current_deposit_val = df_summary_temp.loc[idx, 'Deposit/Bonus']
+                    if pd.isna(current_deposit_val) or current_deposit_val == '':
+                        current_deposit = 0.0
+                    else:
+                        # Remove $ sign and commas if present
+                        if isinstance(current_deposit_val, str):
+                            current_deposit_val = current_deposit_val.replace('
             
 
 # --- Main Page: Title and Tabs ---
@@ -637,10 +630,10 @@ with tab2:
             y=df_chart['End Bal.'],
             mode='lines+markers',
             name='Balance',
-            line=dict(color='#3b82f6', width=3),
-            marker=dict(size=8, color='#1e40af', line=dict(color='white', width=2)),
+            line=dict(color='#818cf8', width=3, shape='spline'),
+            marker=dict(size=8, color='#a78bfa', line=dict(color='#312e81', width=2)),
             fill='tozeroy',
-            fillcolor='rgba(59, 130, 246, 0.1)'
+            fillcolor='rgba(129, 140, 248, 0.2)'
         ))
         
         fig.update_layout(
@@ -649,12 +642,12 @@ with tab2:
             yaxis_title="Balance ($)",
             hovermode='x unified',
             height=450,
-            plot_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(30, 41, 59, 0.5)',
             paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(family="Arial, sans-serif", size=12, color="#1e3a8a"),
-            title_font=dict(size=20, color='#1e40af', family="Arial Black"),
-            xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.05)'),
-            yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.05)')
+            font=dict(family="Inter, sans-serif", size=12, color="#e0e7ff"),
+            title_font=dict(size=20, color='#f8fafc', family="Inter"),
+            xaxis=dict(showgrid=True, gridcolor='rgba(99, 102, 241, 0.1)'),
+            yaxis=dict(showgrid=True, gridcolor='rgba(99, 102, 241, 0.1)')
         )
         st.plotly_chart(fig, use_container_width=True)
 
@@ -673,7 +666,7 @@ with tab3:
             
             df_chart_pnl = df_summary.sort_values(by='Date', ascending=True)
             
-            colors = ['#10b981' if x > 0 else '#ef4444' for x in df_chart_pnl['Actual P&L']]
+            colors = ['#34d399' if x > 0 else '#f87171' for x in df_chart_pnl['Actual P&L']]
             
             fig_pnl = go.Figure()
             
@@ -683,7 +676,9 @@ with tab3:
                 marker_color=colors,
                 name='Daily P&L',
                 text=df_chart_pnl['Actual P&L'].apply(lambda x: f'${x:,.2f}'),
-                textposition='outside'
+                textposition='outside',
+                textfont=dict(color='#f8fafc', size=11),
+                marker=dict(line=dict(color='rgba(99, 102, 241, 0.3)', width=1))
             ))
             
             fig_pnl.update_layout(
@@ -691,12 +686,12 @@ with tab3:
                 xaxis_title="Date", 
                 yaxis_title="P&L ($)",
                 height=450,
-                plot_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(30, 41, 59, 0.5)',
                 paper_bgcolor='rgba(0,0,0,0)',
-                font=dict(family="Arial, sans-serif", size=12, color="#1e3a8a"),
-                title_font=dict(size=18, color='#1e40af', family="Arial Black"),
-                xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.05)'),
-                yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.05)', zeroline=True, zerolinecolor='rgba(0,0,0,0.2)')
+                font=dict(family="Inter, sans-serif", size=12, color="#e0e7ff"),
+                title_font=dict(size=18, color='#f8fafc', family="Inter"),
+                xaxis=dict(showgrid=True, gridcolor='rgba(99, 102, 241, 0.1)'),
+                yaxis=dict(showgrid=True, gridcolor='rgba(99, 102, 241, 0.1)', zeroline=True, zerolinecolor='rgba(139, 92, 246, 0.3)')
             )
             st.plotly_chart(fig_pnl, use_container_width=True)
             
@@ -713,8 +708,8 @@ with tab3:
                 labels=result_counts['Result'],
                 values=result_counts['Count'],
                 hole=0.4,
-                marker=dict(colors=['#10b981', '#ef4444', '#3b82f6']),
-                textfont=dict(size=16, color='white'),
+                marker=dict(colors=['#34d399', '#f87171', '#818cf8']),
+                textfont=dict(size=16, color='white', family='Inter'),
                 textinfo='label+percent'
             )])
             
@@ -723,8 +718,217 @@ with tab3:
                 height=450,
                 plot_bgcolor='rgba(0,0,0,0)',
                 paper_bgcolor='rgba(0,0,0,0)',
-                font=dict(family="Arial, sans-serif", size=12, color="#1e3a8a"),
-                title_font=dict(size=18, color='#1e40af', family="Arial Black"),
-                showlegend=True
+                font=dict(family="Inter, sans-serif", size=12, color="#e0e7ff"),
+                title_font=dict(size=18, color='#f8fafc', family="Inter"),
+                showlegend=True,
+                legend=dict(font=dict(color='#e0e7ff'))
+            )
+            st.plotly_chart(fig_pie, use_container_width=True), '').replace(',', '')
+                        current_deposit = pd.to_numeric(current_deposit_val, errors='coerce')
+                        if pd.isna(current_deposit):
+                            current_deposit = 0.0
+                    
+                    new_deposit = current_deposit + deposit_amount
+                    df_summary_temp.loc[idx, 'Deposit/Bonus'] = round(new_deposit, 2)
+                    
+                    # Drop temporary column
+                    df_summary_temp = df_summary_temp.drop(columns=['Date_str'], errors='ignore')
+                    
+                    # Write back to sheet
+                    write_data_to_sheet('daily_summary', df_summary_temp.drop(columns=['Date'], errors='ignore'), mode='replace')
+                    
+                    # Recalculate summaries
+                    recalculate_all_summaries(st.session_state.initial_balance)
+                    
+                    st.cache_resource.clear()
+                    st.rerun()
+                else:
+                    st.error("❌ Deposit date does not match any existing trade dates. Deposits can only be added on days where trading occurred.")
+            
+
+# --- Main Page: Title and Tabs ---
+st.markdown("# 📈 Trading Performance Tracker")
+
+tab1, tab2, tab3 = st.tabs(["💵 Trade Entry", "🗓️ Daily Summary", "📊 Analytics"])
+
+# --- Tab 1: Trade Entry Form ---
+with tab1:
+    st.header("Log a New Trade")
+    
+    with st.form("Trade Entry Form"):
+        
+        col_1a, col_1b, col_1c, col_1d = st.columns(4)
+        with col_1a:
+            trade_date = st.date_input("📅 Trade Date", datetime.now().date())
+        with col_1b:
+            ticker = st.text_input("🏷️ Ticker", help="e.g., GOOG, EURUSD")
+        with col_1c:
+            direction = st.selectbox("📊 Direction", ["Long", "Short", "Other"])
+        with col_1d:
+            leverage = st.number_input("⚡ Leverage (x)", min_value=1.0, value=1.0, step=0.5)
+
+        col_2a, col_2b, col_2c = st.columns(3)
+        with col_2a:
+            investment = st.number_input("💰 Investment ($)", min_value=0.01, value=1000.00, step=100.0, format="%.2f")
+        with col_2b:
+            pnl = st.number_input("💵 P&L ($)", help="Profit (+), Loss (-)", format="%.2f")
+        with col_2c:
+            pnl_pct = st.number_input("📊 P&L %", help="e.g., 5.5 for 5.5%", format="%.2f")
+        
+        st.markdown("---")
+        submitted = st.form_submit_button("✅ Submit Trade", type="primary", use_container_width=True)
+
+        if submitted:
+            if not ticker.strip():
+                st.error("❌ Ticker cannot be empty.")
+            elif investment <= 0:
+                st.error("❌ Investment must be greater than zero.")
+            else:
+                new_trade_data = pd.DataFrame([{
+                    'trade_date': trade_date.strftime("%Y-%m-%d"),
+                    'ticker': ticker.upper(),
+                    'leverage': leverage,
+                    'direction': direction,
+                    'investment': investment,
+                    'pnl': pnl,
+                    'pnl_pct': pnl_pct,
+                }])
+                
+                if write_data_to_sheet('trades', new_trade_data, mode='append'):
+                    st.success("✅ Trade successfully logged!")
+                    
+                    recalculate_all_summaries(st.session_state.initial_balance)
+                    
+                    st.cache_resource.clear()
+                    st.rerun()
+                else:
+                    st.error("❌ Failed to log trade to Google Sheet.")
+
+
+# --- Tab 2: Daily Summary ---
+with tab2:
+    st.header("Daily Summary")
+    
+    if df_summary.empty:
+        st.info("ℹ️ No summary data available. Enter trades or refresh the page after configuration.")
+    else:
+        df_display = df_summary.copy()
+        
+        currency_cols = ['Start Bal.', 'Target P&L', 'Actual P&L', 'Deposit/Bonus', 'End Bal.']
+        for col in currency_cols:
+             if col in df_display.columns:
+                df_display[col] = pd.to_numeric(df_display[col], errors='coerce').apply(lambda x: f"${x:,.2f}" if pd.notna(x) else '$0.00')
+
+        cols_to_keep = ['Date', 'Week', 'Trades', 'Start Bal.', 'Target P&L', 'Actual P&L', 'Deposit/Bonus', 'End Bal.']
+        df_display = df_display[[col for col in cols_to_keep if col in df_display.columns]]
+            
+        st.dataframe(
+            df_display.sort_values(by='Date', ascending=False), 
+            use_container_width=True,
+            hide_index=True
+        )
+        
+        st.subheader("📈 Balance Progression")
+        
+        df_chart = df_summary.sort_values(by='Date', ascending=True)
+
+        fig = go.Figure()
+        
+        fig.add_trace(go.Scatter(
+            x=df_chart['Date'],
+            y=df_chart['End Bal.'],
+            mode='lines+markers',
+            name='Balance',
+            line=dict(color='#818cf8', width=3, shape='spline'),
+            marker=dict(size=8, color='#a78bfa', line=dict(color='#312e81', width=2)),
+            fill='tozeroy',
+            fillcolor='rgba(129, 140, 248, 0.2)'
+        ))
+        
+        fig.update_layout(
+            title='Balance Progression Over Time',
+            xaxis_title="Date", 
+            yaxis_title="Balance ($)",
+            hovermode='x unified',
+            height=450,
+            plot_bgcolor='rgba(30, 41, 59, 0.5)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(family="Inter, sans-serif", size=12, color="#e0e7ff"),
+            title_font=dict(size=20, color='#f8fafc', family="Inter"),
+            xaxis=dict(showgrid=True, gridcolor='rgba(99, 102, 241, 0.1)'),
+            yaxis=dict(showgrid=True, gridcolor='rgba(99, 102, 241, 0.1)')
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+# --- Tab 3: Performance Analytics ---
+with tab3:
+    st.header("Performance Analytics")
+    
+    if df_trades.empty:
+        st.info("ℹ️ No trade data yet. Start logging trades to see analytics!")
+    else:
+        
+        col_pnl, col_winrate = st.columns(2)
+        
+        with col_pnl:
+            st.subheader("💵 Daily P&L Chart")
+            
+            df_chart_pnl = df_summary.sort_values(by='Date', ascending=True)
+            
+            colors = ['#34d399' if x > 0 else '#f87171' for x in df_chart_pnl['Actual P&L']]
+            
+            fig_pnl = go.Figure()
+            
+            fig_pnl.add_trace(go.Bar(
+                x=df_chart_pnl['Date'],
+                y=df_chart_pnl['Actual P&L'],
+                marker_color=colors,
+                name='Daily P&L',
+                text=df_chart_pnl['Actual P&L'].apply(lambda x: f'${x:,.2f}'),
+                textposition='outside',
+                marker=dict(line=dict(color='rgba(99, 102, 241, 0.3)', width=1))
+            ))
+            
+            fig_pnl.update_layout(
+                title='Daily Trading Profit/Loss',
+                xaxis_title="Date", 
+                yaxis_title="P&L ($)",
+                height=450,
+                plot_bgcolor='rgba(30, 41, 59, 0.5)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(family="Inter, sans-serif", size=12, color="#e0e7ff"),
+                title_font=dict(size=18, color='#f8fafc', family="Inter"),
+                xaxis=dict(showgrid=True, gridcolor='rgba(99, 102, 241, 0.1)'),
+                yaxis=dict(showgrid=True, gridcolor='rgba(99, 102, 241, 0.1)', zeroline=True, zerolinecolor='rgba(139, 92, 246, 0.3)')
+            )
+            st.plotly_chart(fig_pnl, use_container_width=True)
+            
+        with col_winrate:
+            st.subheader("🎯 Trade Win/Loss Breakdown")
+            
+            df_trades_temp = df_trades.copy()
+            df_trades_temp['Result'] = df_trades_temp['pnl'].apply(lambda x: 'Win' if x > 0 else ('Loss' if x < 0 else 'Breakeven'))
+            
+            result_counts = df_trades_temp['Result'].value_counts().reset_index()
+            result_counts.columns = ['Result', 'Count']
+            
+            fig_pie = go.Figure(data=[go.Pie(
+                labels=result_counts['Result'],
+                values=result_counts['Count'],
+                hole=0.4,
+                marker=dict(colors=['#34d399', '#f87171', '#818cf8']),
+                textfont=dict(size=16, color='white', family='Inter'),
+                textinfo='label+percent'
+            )])
+            
+            fig_pie.update_layout(
+                title='Total Trade Outcomes',
+                height=450,
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(family="Inter, sans-serif", size=12, color="#e0e7ff"),
+                title_font=dict(size=18, color='#f8fafc', family="Inter"),
+                showlegend=True,
+                legend=dict(font=dict(color='#e0e7ff'))
             )
             st.plotly_chart(fig_pie, use_container_width=True)
