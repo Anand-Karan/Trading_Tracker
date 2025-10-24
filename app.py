@@ -880,7 +880,7 @@ with tab2:
         st.plotly_chart(fig, use_container_width=True)
 
 
-    
+    ###
         # Existing Balance Progression chart ends here: st.plotly_chart(fig, use_container_width=True)
 
 
@@ -927,14 +927,24 @@ with tab2:
             ))
             
             # Calculate max absolute P&L and Running P&L for symmetrical axis range
+            # max_pnl = df_trades_today['pnl'].abs().max()
+            # max_running = df_trades_today['Running P&L'].abs().max()
+            
+            # y_max = max(max_pnl, max_running) * 1.1
+
+            # # FIX: Prevent Plotly error when all P&L values are zero
+            # if y_max == 0:
+            #     y_max = 1.0 # Sets a minimal range of [-1.0, 1.0]
+            # Calculate max absolute P&L and Running P&L for symmetrical axis range
             max_pnl = df_trades_today['pnl'].abs().max()
             max_running = df_trades_today['Running P&L'].abs().max()
             
             y_max = max(max_pnl, max_running) * 1.1
 
-            # FIX: Prevent Plotly error when all P&L values are zero
-            if y_max == 0:
-                y_max = 1.0 # Sets a minimal range of [-1.0, 1.0]
+            # --- ROBUST FIX: Ensure y_max is a positive, finite number ---
+            # This handles NaN/Inf from data issues AND the case where P&L is exactly 0.
+            if pd.isna(y_max) or y_max <= 0:
+                y_max = 1.0 # Sets a minimal safe range of [-1.0, 1.0]
 
             fig_daily.update_layout(
                 title=f"Today's Individual Trade P&L ({today_date_obj.strftime('%Y-%m-%d')})",
@@ -979,7 +989,7 @@ with tab2:
                 margin=dict(t=50) 
             )
             st.plotly_chart(fig_daily, use_container_width=True)
-
+###
 # --- Tab 3: Performance Analytics ---
 with tab3:
     st.header("Performance Analytics")
