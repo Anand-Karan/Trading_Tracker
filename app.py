@@ -18,24 +18,24 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- Custom CSS for Subtle Dark Green Styling (FINAL REVISION) ---
+# --- Custom CSS for Ultra Dark Green/Black Aesthetic ---
 st.markdown("""
     <style>
     /* Import Google Fonts */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
     
-    /* --- COLOR PALETTE (Subtle Robinhood Style) --- */
-    /* BG Primary: #17191e (Charcoal) */
-    /* BG Secondary: #212328 (Darker Charcoal) */
-    /* **VIBRANT GREEN (For P&L)**: #00C800 */
-    /* **SUBTLE GREEN (For Accents/Titles)**: #70E0A7 */
-    /* Accent Red: #FF5353 (Vibrant Red) */
-    /* Text Light: #F0F4FF (Very light text for readability) */
-    /* Text General: #E0E7FF */
-
-    /* Main background and theme */
+    /* === REFINED COLOR PALETTE === */
+    /* Pure Black BG: #0a0e0f */
+    /* Dark Charcoal: #0f1419 */
+    /* Neon Green (Primary): #00ff88 */
+    /* Soft Green (Secondary): #00d97e */
+    /* Dark Green Accent: #1a4d3e */
+    /* Red (Loss): #ff4757 */
+    /* Text: #e8f5e9 */
+    
+    /* Main background - Pure black with subtle gradient */
     .main {
-        background: linear-gradient(135deg, #17191e 0%, #212328 100%);
+        background: linear-gradient(135deg, #0a0e0f 0%, #0f1419 100%);
         background-attachment: fixed;
         font-family: 'Inter', sans-serif;
     }
@@ -43,140 +43,288 @@ st.markdown("""
     .block-container {
         padding-top: 2rem;
         padding-bottom: 2rem;
-        background: rgba(33, 35, 40, 0.8);
-        backdrop-filter: blur(5px);
-        border-radius: 12px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
-        border: 1px solid rgba(112, 224, 167, 0.15); /* Subtle green border */
+        background: rgba(15, 20, 25, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(0, 255, 136, 0.1);
+        border: 1px solid rgba(0, 255, 136, 0.1);
         margin: 1rem auto;
     }
     
-    /* Header styling */
+    /* Header styling - Neon green gradient */
     h1 {
         color: #f8fafc;
         font-weight: 800;
         font-size: 3rem !important;
         text-align: center;
         margin-bottom: 2rem;
-        /* SUBTLE GREEN GRADIENT for the main title */
-        background: linear-gradient(135deg, #70E0A7, #41B378); 
+        background: linear-gradient(135deg, #00ff88, #00d97e);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
-        text-shadow: 0 0 10px rgba(112, 224, 167, 0.3);
+        text-shadow: 0 0 30px rgba(0, 255, 136, 0.5);
+        filter: drop-shadow(0 0 20px rgba(0, 255, 136, 0.3));
     }
     
     h2, h3 {
-        color: #E0E7FF;
+        color: #e8f5e9;
         font-weight: 700;
-        /* SUBTLE GREEN UNDERLINE/ACCENT */
-        border-bottom: 2px solid rgba(112, 224, 167, 0.3); 
-        padding-bottom: 5px;
-        margin-bottom: 15px;
+        border-bottom: 2px solid rgba(0, 255, 136, 0.3);
+        padding-bottom: 8px;
+        margin-bottom: 20px;
     }
     
-    /* Sidebar styling */
+    /* Sidebar - Deep black with green accent */
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #17191e 0%, #292c31 100%);
-        border-right: 1px solid rgba(112, 224, 167, 0.2);
+        background: linear-gradient(180deg, #0a0e0f 0%, #0f1419 100%);
+        border-right: 2px solid rgba(0, 255, 136, 0.2);
     }
     
-    /* Sidebar General Text Readability */
     [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
-        color: #F0F4FF; /* Brighter text for better sidebar readability */
+        color: #e8f5e9;
     }
 
     [data-testid="stSidebar"] h3 {
-        color: #f8fafc !important; 
-        text-shadow: 0 0 5px rgba(112, 224, 167, 0.5);
-        border-bottom: none; 
-    }
-    
-    /* Metric cards styling */
-    [data-testid="stMetricValue"] {
-        font-size: 2rem;
+        color: #00ff88 !important; 
+        text-shadow: 0 0 15px rgba(0, 255, 136, 0.6);
+        border-bottom: none;
         font-weight: 800;
-        color: #f8fafc;
     }
     
-    /* Positive delta (Profit) */
-    [data-testid="stMetricDelta"] {
-        color: #00C800; 
+    /* Metric cards - Enhanced styling */
+    [data-testid="stMetricValue"] {
+        font-size: 2.2rem;
+        font-weight: 800;
+        color: #00ff88;
+        text-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
     }
     
-    /* Negative delta (Loss) */
-    [data-testid="stMetricDelta"][data-baseweb="badge"]::before {
-        content: "▼";
-        color: #FF5353 !important; 
-    }
-    [data-testid="stMetricDelta"][data-baseweb="badge"] {
-        color: #FF5353 !important;
-    }
-    
-    /* Input Labels - FIX: Make all input labels bright for visibility */
-    .stTextInput label, .stNumberInput label, .stSelectbox label, .stDateInput label {
-        color: #F0F4FF !important; /* Very bright for max contrast */
+    [data-testid="stMetricLabel"] {
+        color: #b8c5b8;
         font-weight: 600;
+        font-size: 0.95rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
-
-    /* Tabs styling */
-    .stTabs [aria-selected="true"] {
-        /* USE SUBTLE GREEN FOR ACTIVE TAB ACCENT */
-        background: #70E0A7 !important; 
-        color: #17191e !important; 
+    
+    [data-testid="stMetricDelta"] {
+        color: #00ff88;
         font-weight: 700;
-        box-shadow: 0 2px 10px rgba(112, 224, 167, 0.3);
     }
     
-    /* Info box - FIX: Change the color of the INFO box to a green tone for readability */
-    .stInfo {
-        background: rgba(112, 224, 167, 0.15); /* Light green background */
-        border-left: 4px solid #70E0A7; /* Subtle green border */
-        color: #F0F4FF; /* Very light text for contrast */
-        padding: 1rem;
-        border-radius: 4px;
+    /* Tabs - Sleek dark with neon green active state */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 12px;
+        background-color: rgba(15, 20, 25, 0.9);
+        border-radius: 12px;
+        padding: 0.75rem;
+        border: 1px solid rgba(0, 255, 136, 0.15);
     }
     
-    .stInfo a {
-        color: #A8FFC7 !important; /* Brighter link in info box */
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        background-color: rgba(26, 77, 62, 0.2);
+        border-radius: 10px;
+        color: #b8c5b8;
+        font-weight: 600;
+        font-size: 1rem;
+        padding: 0 2rem;
+        transition: all 0.3s ease;
+        border: 1px solid transparent;
     }
-
-    /* Button styling */
-    .stButton button[kind="primary"] {
-        background-color: #00C800; /* KEEP VIBRANT GREEN for core action */
-        color: #17191e;
-        box-shadow: 0 4px 15px rgba(0, 200, 0, 0.4);
+    
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: rgba(26, 77, 62, 0.4);
+        border-color: rgba(0, 255, 136, 0.3);
+        transform: translateY(-2px);
+        color: #00ff88;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, rgba(0, 255, 136, 0.2), rgba(0, 217, 126, 0.2));
+        color: #00ff88 !important;
+        font-weight: 800;
+        box-shadow: 0 4px 20px rgba(0, 255, 136, 0.4);
+        border: 1px solid rgba(0, 255, 136, 0.5);
+    }
+    
+    /* Form styling - Dark with green accents */
+    .stForm {
+        background: linear-gradient(135deg, rgba(15, 20, 25, 0.95) 0%, rgba(26, 77, 62, 0.1) 100%);
+        border-radius: 15px;
+        padding: 2rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), 0 0 40px rgba(0, 255, 136, 0.05);
+        border: 2px solid rgba(0, 255, 136, 0.2);
+        backdrop-filter: blur(10px);
+    }
+    
+    /* Input fields - Dark with green focus */
+    .stTextInput input, .stNumberInput input, .stSelectbox select, .stDateInput input {
+        background-color: rgba(10, 14, 15, 0.95) !important;
+        color: #e8f5e9 !important;
+        border-radius: 10px;
+        border: 2px solid rgba(0, 255, 136, 0.2) !important;
+        padding: 0.75rem;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .stTextInput input:focus, .stNumberInput input:focus, .stSelectbox select:focus, .stDateInput input:focus {
+        border-color: #00ff88 !important;
+        box-shadow: 0 0 0 3px rgba(0, 255, 136, 0.15) !important;
+        background-color: rgba(10, 14, 15, 1) !important;
+    }
+    
+    .stTextInput label, .stNumberInput label, .stSelectbox label, .stDateInput label {
+        color: #e8f5e9 !important;
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+    
+    /* Button styling - Neon green gradient */
+    .stButton button {
+        background: linear-gradient(135deg, #00ff88 0%, #00d97e 100%);
+        color: #0a0e0f;
+        font-weight: 800;
+        font-size: 1.1rem;
+        padding: 0.85rem 2rem;
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 4px 20px rgba(0, 255, 136, 0.4);
+        transition: all 0.3s ease;
+        width: 100%;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .stButton button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 30px rgba(0, 255, 136, 0.6);
+        background: linear-gradient(135deg, #00d97e 0%, #00ff88 100%);
+    }
+    
+    /* Secondary button (Reset) */
+    .stButton button[kind="secondary"] {
+        background: linear-gradient(135deg, rgba(255, 71, 87, 0.2), rgba(255, 71, 87, 0.3));
+        color: #ff4757;
+        border: 2px solid rgba(255, 71, 87, 0.5);
+        box-shadow: 0 4px 15px rgba(255, 71, 87, 0.2);
+    }
+    
+    .stButton button[kind="secondary"]:hover {
+        background: linear-gradient(135deg, rgba(255, 71, 87, 0.3), rgba(255, 71, 87, 0.4));
+        box-shadow: 0 6px 25px rgba(255, 71, 87, 0.4);
     }
     
     /* Success/Error messages */
     .stSuccess {
-        background-color: rgba(0, 200, 0, 0.2);
-        color: #00C800;
-        border-left: 4px solid #00C800;
+        background-color: rgba(0, 255, 136, 0.15);
+        color: #00ff88;
+        padding: 1rem;
+        border-radius: 10px;
+        border-left: 4px solid #00ff88;
+        backdrop-filter: blur(10px);
     }
     
     .stError {
-        background-color: rgba(255, 83, 83, 0.2);
-        color: #FF5353;
-        border-left: 4px solid #FF5353;
+        background-color: rgba(255, 71, 87, 0.15);
+        color: #ff4757;
+        padding: 1rem;
+        border-radius: 10px;
+        border-left: 4px solid #ff4757;
+        backdrop-filter: blur(10px);
     }
     
-    /* Progress bar fill colors (Uses VIBRANT P&L colors) */
+    /* Info box - Dark green theme instead of blue */
+    .stInfo {
+        background: linear-gradient(135deg, rgba(26, 77, 62, 0.3), rgba(0, 255, 136, 0.05));
+        border-left: 4px solid #00ff88;
+        color: #e8f5e9;
+        padding: 1rem;
+        border-radius: 10px;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 2px 10px rgba(0, 255, 136, 0.1);
+    }
+    
+    .stInfo a {
+        color: #00ff88 !important;
+        font-weight: 600;
+    }
+    
+    /* Dataframe styling */
+    .dataframe {
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+        background-color: rgba(15, 20, 25, 0.95) !important;
+    }
+    
+    /* Chart containers */
+    .js-plotly-plot {
+        border-radius: 15px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+        background: rgba(15, 20, 25, 0.95);
+        padding: 1.5rem;
+        border: 1px solid rgba(0, 255, 136, 0.1);
+    }
+    
+    /* Divider */
+    hr {
+        border: none;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, rgba(0, 255, 136, 0.5), transparent);
+        margin: 2rem 0;
+    }
+    
+    /* Progress bar - Green for wins, Red for losses */
     .stProgress > div > div > div:first-child {
-        background-color: #292c31 !important; 
+        background-color: rgba(26, 77, 62, 0.3) !important; 
     }
     .stProgress > div > div > div > div {
-        background-color: #00C800 !important; /* VIBRANT GREEN */
+        background-color: #00ff88 !important;
+        box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
     }
     .stProgress.loss > div > div > div > div {
-        background-color: #FF5353 !important; /* VIBRANT RED */
+        background-color: #ff4757 !important;
+        box-shadow: 0 0 10px rgba(255, 71, 87, 0.5);
     }
-
+    
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+        width: 12px;
+        height: 12px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: rgba(15, 20, 25, 0.8);
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: linear-gradient(135deg, #00ff88, #00d97e);
+        border-radius: 6px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(135deg, #00d97e, #00ff88);
+    }
+    
+    /* Expander styling */
+    .streamlit-expanderHeader {
+        background-color: rgba(26, 77, 62, 0.2);
+        border-radius: 8px;
+        color: #e8f5e9;
+        font-weight: 600;
+    }
+    
+    .streamlit-expanderHeader:hover {
+        background-color: rgba(26, 77, 62, 0.3);
+        border-color: rgba(0, 255, 136, 0.3);
+    }
     </style>
 """, unsafe_allow_html=True)
 
 
-# --- Configuration and Setup (REMAINS THE SAME) ---
+# --- Configuration and Setup ---
 if "gsheets" not in st.secrets or "sheet_id" not in st.secrets["gsheets"]:
     st.error("Google Sheets configuration is missing. Please ensure 'gsheets.sheet_id' is set in your secrets.")
     SHEET_ID = None
@@ -184,7 +332,7 @@ else:
     SHEET_ID = st.secrets["gsheets"]["sheet_id"]
 
 
-# --- Utility Functions for Google Sheets Interaction (REMAINS THE SAME) ---
+# --- Utility Functions for Google Sheets Interaction ---
 
 @st.cache_resource(ttl=3600)
 def connect_gsheets():
@@ -247,7 +395,7 @@ def write_data_to_sheet(sheet_name, df, mode='append'):
         st.error(f"Error writing data to sheet '{sheet_name}': {e}")
         return False
 
-# --- Core Business Logic: Recalculate Summaries (CRITICAL - CST FIX INCLUDED) ---
+# --- Core Business Logic: Recalculate Summaries ---
 
 def recalculate_all_summaries(initial_balance=2283.22):
     """
@@ -256,13 +404,11 @@ def recalculate_all_summaries(initial_balance=2283.22):
     """
     if not SHEET_ID: return pd.DataFrame()
     
-    # Get the current date in the target timezone (CST/CDT)
     today_date = datetime.now(CENTRAL_TZ).date()
     today_date_str = today_date.strftime("%Y-%m-%d")
 
     df_trades = get_data_from_sheet('trades')
     
-    # --- 1. Initial State if No Trades ---
     if df_trades.empty or df_trades.shape[0] == 0:
         summary_data = {
             'Date': [today_date_str],
@@ -278,7 +424,6 @@ def recalculate_all_summaries(initial_balance=2283.22):
         write_data_to_sheet('daily_summary', df_summary, mode='replace')
         return df_summary
 
-    # --- 2. Processing Trades & Recalculating History ---
     try:
         df_trades['trade_date'] = pd.to_datetime(df_trades['trade_date'], errors='coerce').dt.date.fillna(pd.NaT).ffill()
         df_trades['pnl'] = pd.to_numeric(df_trades['pnl'], errors='coerce').fillna(0)
@@ -318,7 +463,6 @@ def recalculate_all_summaries(initial_balance=2283.22):
     df_summary = pd.DataFrame(daily_summary_list)
     df_summary['Date'] = df_summary['Date'].astype(str)
     
-    # --- 3. Re-integrate deposits/bonuses and Recalculate Balances ---
     df_old_summary = get_data_from_sheet('daily_summary')
     if not df_old_summary.empty:
         df_old_summary['Date'] = pd.to_datetime(df_old_summary['Date'], errors='coerce').dt.date.astype(str)
@@ -330,7 +474,6 @@ def recalculate_all_summaries(initial_balance=2283.22):
         
         df_summary = df_merged[['Date', 'Week', 'Trades', 'Start Bal.', 'Target P&L', 'Actual P&L', 'Deposit/Bonus', 'End Bal.']]
         
-        # Recalculate balances with Deposit/Bonus applied
         current_balance_recalc = initial_balance
         new_summary_list = []
         for index, row in df_summary.iterrows():
@@ -357,7 +500,6 @@ def recalculate_all_summaries(initial_balance=2283.22):
         df_summary = pd.DataFrame(new_summary_list)
         df_summary['Date'] = df_summary['Date'].astype(str)
         
-    # --- 4. FIX: Add today's entry ONLY if the last recorded day is NOT today ---
     if not df_summary.empty:
         last_recorded_date_str = df_summary['Date'].iloc[-1]
         
@@ -387,7 +529,7 @@ def recalculate_all_summaries(initial_balance=2283.22):
         
     return df_summary
 
-# --- Data Loading and Caching (REMAINS THE SAME) ---
+# --- Data Loading and Caching ---
 
 def load_data():
     """Load data for the UI."""
@@ -429,22 +571,20 @@ def load_data():
             
     return df_summary, df_trades
 
-# --- Initialize App and State (REMAINS THE SAME) ---
+# --- Initialize App and State ---
 
 if 'initial_balance' not in st.session_state:
     st.session_state.initial_balance = 2272.22 
 
-# Load data initially to set the starting balance correctly
 df_summary_temp, df_trades_temp = load_data() 
 if not df_summary_temp.empty and 'Start Bal.' in df_summary_temp.columns:
     st.session_state.initial_balance = df_summary_temp['Start Bal.'].iloc[0]
     
-# Immediate recalculation with the timezone-aware date logic
 recalculate_all_summaries(st.session_state.initial_balance)
 df_summary, df_trades = load_data()
 
 
-# --- Sidebar: Quick Stats (REMAINS THE SAME) ---
+# --- Sidebar: Quick Stats ---
 
 with st.sidebar:
     st.markdown("### 📊 Quick Stats")
@@ -500,26 +640,20 @@ with st.sidebar:
                 if gc:
                     spreadsheet = gc.open_by_key(SHEET_ID)
                     
-                    # Clear trades sheet
                     trades_sheet = spreadsheet.worksheet('trades')
                     trades_sheet.clear()
-                    # Add headers back
                     trades_sheet.update('A1', [['trade_date', 'ticker', 'leverage', 'direction', 'investment', 'pnl', 'pnl_pct']])
                     
-                    # Clear daily summary sheet
                     summary_sheet = spreadsheet.worksheet('daily_summary')
                     summary_sheet.clear()
-                    # Add headers back
                     summary_sheet.update('A1', [['Date', 'Week', 'Trades', 'Start Bal.', 'Target P&L', 'Actual P&L', 'Deposit/Bonus', 'End Bal.']])
                     
-                    # Clear all caches
                     st.cache_data.clear()
                     st.cache_resource.clear()
                     
                     st.success("✅ All data has been deleted successfully!")
                     st.balloons()
                     
-                    # Wait a moment then rerun
                     import time
                     time.sleep(1)
                     st.rerun()
@@ -534,64 +668,52 @@ st.markdown("# 📈 Trading Performance Tracker")
 
 tab1, tab2, tab3 = st.tabs(["💵 Trade Entry", "🗓️ Daily Summary", "📊 Analytics"])
 
-# --- Tab 1: Trade Entry Form (with Progress Bar) ---
+# --- Tab 1: Trade Entry Form ---
 with tab1:
     
-    # === Today's Performance Snapshot ===
     st.subheader("🎯 Today's Performance Snapshot (CST/CDT)")
     
-    # Get Today's Date Object using the defined timezone
     today_date_obj = datetime.now(CENTRAL_TZ).date()
 
-    # Find Today's Summary Row (Guaranteed to exist now)
     df_today = df_summary[df_summary['Date'] == today_date_obj]
     
     if not df_today.empty:
         today_target_pl = df_today['Target P&L'].iloc[0]
         today_actual_pl = df_today['Actual P&L'].iloc[0]
         
-        # --- PROGRESS BAR LOGIC (CST/Data-Aware) ---
-        
         if today_target_pl > 0:
             
             st.info(f"**Target P&L for Today ({today_date_obj.strftime('%b %d')}):** `${today_target_pl:,.2f}`")
             
-            # --- Determine State and Style ---
             progress_css_class = ""
             if today_actual_pl >= today_target_pl:
-                # Target HIT!
                 fill_ratio = 1.0
                 fill_value = 100
                 label_text = f"**Target HIT!** (P&L: ${today_actual_pl:,.2f})"
                 progress_css_class = "" 
                 
             elif today_actual_pl > 0:
-                # Making Progress
                 fill_ratio = today_actual_pl / today_target_pl 
                 fill_value = int(fill_ratio * 100)
                 label_text = f"**Making Progress:** {fill_value:.1f}% of Target (P&L: ${today_actual_pl:,.2f})"
                 progress_css_class = "progress" 
                 
-            else: # Loss or Breakeven (Actual P&L <= 0)
-                # Loss/Behind Target
+            else:
                 fill_value = 0 
                 label_text = f"**LOSS/Behind Target:** (P&L: ${today_actual_pl:,.2f})"
                 progress_css_class = "loss" 
                 
-            # Embed custom CSS for coloring the bar based on loss/progress/hit
             st.markdown(
                 f"""
                 <style>
-                /* Inject custom CSS class to control the bar color (uses VIBRANT P&L colors) */
                 .stProgress > div > div > div > div {{
-                    background-color: {'#FF5353' if progress_css_class == 'loss' else ('#00C800')} !important;
+                    background-color: {'#ff4757' if progress_css_class == 'loss' else '#00ff88'} !important;
                 }}
                 </style>
                 """,
                 unsafe_allow_html=True
             )
             
-            # Display Progress Bar.
             st.progress(
                 value=min(100, fill_value), 
                 text=label_text 
@@ -662,12 +784,10 @@ with tab2:
     else:
         df_display = df_summary.copy()
         
-        # Sort by Date and convert back to string for clean table display
         if 'Date' in df_display.columns:
             df_display = df_display.sort_values(by='Date', ascending=False)
             df_display['Date'] = df_display['Date'].astype(str)
         
-        # Format currency columns
         currency_cols = ['Start Bal.', 'Target P&L', 'Actual P&L', 'Deposit/Bonus', 'End Bal.']
         for col in currency_cols:
              if col in df_display.columns:
@@ -688,38 +808,34 @@ with tab2:
 
         fig = go.Figure()
         
-        # 1. End Balance (The main line - subtle light green)
         fig.add_trace(go.Scatter(
             x=df_chart['Date'].astype(str),
             y=df_chart['End Bal.'],
             mode='lines+markers',
             name='End Balance',
-            line=dict(color='#70E0A7', width=3, shape='spline'), # Subtle Green for the line
-            marker=dict(size=8, color='#A8FFC7', line=dict(color='#17191e', width=2)), # Lighter marker
+            line=dict(color='#00ff88', width=3, shape='spline'),
+            marker=dict(size=8, color='#00d97e', line=dict(color='#0a0e0f', width=2)),
             fill='tozeroy',
-            fillcolor='rgba(112, 224, 167, 0.1)' # Very subtle fill
+            fillcolor='rgba(0, 255, 136, 0.1)'
         ))
         
-        # 2. Start Balance (Dotted Line - light gray/yellow for contrast)
         fig.add_trace(go.Scatter(
             x=df_chart['Date'].astype(str),
             y=df_chart['Start Bal.'],
             mode='lines+markers',
             name='Start Balance',
-            line=dict(color='#FACC15', width=2, dash='dot'), 
-            marker=dict(size=6, color='#FACC15')
+            line=dict(color='#fbbf24', width=2, dash='dot'), 
+            marker=dict(size=6, color='#fbbf24')
         ))
 
-        # 3. Target End Balance (Dashed Line - vibrant green)
         fig.add_trace(go.Scatter(
             x=df_chart['Date'].astype(str),
             y=df_chart['Start Bal.'] + df_chart['Target P&L'],
             mode='lines',
             name='Target End Bal',
-            line=dict(color='#00C800', width=2, dash='dash') # VIBRANT GREEN for Target
+            line=dict(color='#34d399', width=2, dash='dash')
         ))
         
-        # Determine y-axis range dynamically with padding
         if not df_chart.empty:
             min_bal = df_chart[['End Bal.', 'Start Bal.']].min().min()
             max_bal = df_chart[['End Bal.', 'Start Bal.']].max().max()
@@ -735,27 +851,27 @@ with tab2:
             yaxis_title="Balance ($)",
             hovermode='x unified',
             height=450,
-            plot_bgcolor='#212328', 
+            plot_bgcolor='#0f1419', 
             paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(family="Inter, sans-serif", size=12, color="#E0E7FF"),
-            title_font=dict(size=20, color='#f8fafc', family="Inter"),
+            font=dict(family="Inter, sans-serif", size=12, color="#e8f5e9"),
+            title_font=dict(size=20, color='#00ff88', family="Inter"),
             legend=dict(
                 orientation="h", 
                 yanchor="bottom", y=1.02, xanchor="right", x=1, 
                 bgcolor='rgba(0,0,0,0)',
-                font=dict(color="#E0E7FF")
+                font=dict(color="#e8f5e9")
             ),
             xaxis=dict(
                 showgrid=True, 
-                gridcolor='rgba(112, 224, 167, 0.1)',
-                tickfont=dict(color='#E0E7FF'),
+                gridcolor='rgba(0, 255, 136, 0.1)',
+                tickfont=dict(color='#e8f5e9'),
                 tickformat="%b %d<br>%Y",
                 dtick='d' 
             ),
             yaxis=dict(
                 showgrid=True, 
-                gridcolor='rgba(112, 224, 167, 0.1)',
-                tickfont=dict(color='#E0E7FF'),
+                gridcolor='rgba(0, 255, 136, 0.1)',
+                tickfont=dict(color='#e8f5e9'),
                 autorange=False, 
                 range=y_range 
             ),
@@ -771,7 +887,6 @@ with tab3:
         st.info("ℹ️ No trade data yet. Start logging trades to see analytics!")
     else:
         
-        # === Date Filter ===
         all_dates_summary = df_summary['Date'].unique()
         all_dates_trades = df_trades['trade_date'].unique()
         
@@ -811,14 +926,12 @@ with tab3:
         else:
             col_pnl, col_winrate = st.columns(2)
             
-            # --- Daily P&L Chart ---
             with col_pnl:
                 st.subheader("💵 Daily P&L Chart")
                 
                 df_chart_pnl = df_summary_filtered.sort_values(by='Date', ascending=True)
                 
-                # Uses VIBRANT P&L colors
-                colors = ['#00C800' if x > 0 else '#FF5353' for x in df_chart_pnl['Actual P&L']]
+                colors = ['#00ff88' if x > 0 else '#ff4757' for x in df_chart_pnl['Actual P&L']]
                 
                 fig_pnl = go.Figure()
                 
@@ -829,7 +942,7 @@ with tab3:
                     name='Daily P&L',
                     text=df_chart_pnl['Actual P&L'].apply(lambda x: f'${x:,.2f}'),
                     textposition='auto', 
-                    textfont=dict(color='#17191e', size=11), 
+                    textfont=dict(color='#0a0e0f', size=11, weight='bold'), 
                     marker=dict(line=dict(color='rgba(0, 0, 0, 0.3)', width=1))
                 ))
                 
@@ -838,29 +951,28 @@ with tab3:
                     xaxis_title="Date", 
                     yaxis_title="P&L ($)",
                     height=450,
-                    plot_bgcolor='#212328',
+                    plot_bgcolor='#0f1419',
                     paper_bgcolor='rgba(0,0,0,0)',
-                    font=dict(family="Inter, sans-serif", size=12, color="#E0E7FF"),
-                    title_font=dict(size=18, color='#f8fafc', family="Inter"),
+                    font=dict(family="Inter, sans-serif", size=12, color="#e8f5e9"),
+                    title_font=dict(size=18, color='#00ff88', family="Inter"),
                     xaxis=dict(
                         showgrid=True, 
-                        gridcolor='rgba(112, 224, 167, 0.1)',
-                        tickfont=dict(color='#E0E7FF'),
+                        gridcolor='rgba(0, 255, 136, 0.1)',
+                        tickfont=dict(color='#e8f5e9'),
                         tickformat="%b %d<br>%Y" ,
                         dtick='d' 
                     ),
                     yaxis=dict(
                         showgrid=True, 
-                        gridcolor='rgba(112, 224, 167, 0.1)', 
+                        gridcolor='rgba(0, 255, 136, 0.1)', 
                         zeroline=True, 
-                        zerolinecolor='rgba(112, 224, 167, 0.3)',
-                        tickfont=dict(color='#E0E7FF')
+                        zerolinecolor='rgba(0, 255, 136, 0.3)',
+                        tickfont=dict(color='#e8f5e9')
                     ),
                     margin=dict(t=50)
                 )
                 st.plotly_chart(fig_pnl, use_container_width=True)
                 
-            # --- Trade Win/Loss Breakdown ---
             with col_winrate:
                 st.subheader("🎯 Trade Win/Loss Breakdown")
                 
@@ -870,28 +982,26 @@ with tab3:
                 result_counts = df_trades_temp['Result'].value_counts().reset_index()
                 result_counts.columns = ['Result', 'Count']
 
-                # Ensure all categories (Win, Loss, Breakeven) are present for consistent coloring
                 all_results = pd.DataFrame({'Result': ['Win', 'Loss', 'Breakeven'], 'Count': [0, 0, 0]})
                 result_counts = pd.merge(all_results, result_counts, on='Result', how='left', suffixes=('_all', '')).fillna(0)
                 result_counts['Count'] = result_counts['Count_all'] + result_counts['Count'] 
                 result_counts = result_counts[['Result', 'Count']]
                 result_counts = result_counts[result_counts['Count'] > 0] 
                 
-                # Define colors for Pie chart (Uses VIBRANT P&L colors)
                 pie_colors = {
-                    'Win': '#00C800',
-                    'Loss': '#FF5353',
-                    'Breakeven': '#AAAAAA'
+                    'Win': '#00ff88',
+                    'Loss': '#ff4757',
+                    'Breakeven': '#94a3b8'
                 }
                 
-                sorted_results = [pie_colors.get(r, '#AAAAAA') for r in result_counts['Result']]
+                sorted_results = [pie_colors.get(r, '#94a3b8') for r in result_counts['Result']]
                 
                 fig_pie = go.Figure(data=[go.Pie(
                     labels=result_counts['Result'],
                     values=result_counts['Count'],
                     hole=0.4,
                     marker=dict(colors=sorted_results), 
-                    textfont=dict(size=16, color='white', family='Inter'),
+                    textfont=dict(size=16, color='#0a0e0f', family='Inter', weight='bold'),
                     textinfo='label+percent'
                 )])
                 
@@ -900,10 +1010,10 @@ with tab3:
                     height=450,
                     plot_bgcolor='rgba(0,0,0,0)',
                     paper_bgcolor='rgba(0,0,0,0)',
-                    font=dict(family="Inter, sans-serif", size=12, color="#E0E7FF"),
-                    title_font=dict(size=18, color='#f8fafc', family="Inter"),
+                    font=dict(family="Inter, sans-serif", size=12, color="#e8f5e9"),
+                    title_font=dict(size=18, color='#00ff88', family="Inter"),
                     showlegend=True,
-                    legend=dict(font=dict(color='#E0E7FF')),
+                    legend=dict(font=dict(color='#e8f5e9')),
                     margin=dict(t=50)
                 )
                 st.plotly_chart(fig_pie, use_container_width=True)
