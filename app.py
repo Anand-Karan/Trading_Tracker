@@ -801,84 +801,8 @@ with tab2:
             use_container_width=True,
             hide_index=True
         )
+        #######
         
-        st.subheader("📈 Balance Progression")
-        
-        df_chart = df_summary.sort_values(by='Date', ascending=True)
-
-        fig = go.Figure()
-        
-        fig.add_trace(go.Scatter(
-            x=df_chart['Date'].astype(str),
-            y=df_chart['End Bal.'],
-            mode='lines+markers',
-            name='End Balance',
-            line=dict(color='#00ff88', width=3, shape='spline'),
-            marker=dict(size=8, color='#00d97e', line=dict(color='#0a0e0f', width=2)),
-            fill='tozeroy',
-            fillcolor='rgba(0, 255, 136, 0.1)'
-        ))
-        
-        fig.add_trace(go.Scatter(
-            x=df_chart['Date'].astype(str),
-            y=df_chart['Start Bal.'],
-            mode='lines+markers',
-            name='Start Balance',
-            line=dict(color='#fbbf24', width=2, dash='dot'), 
-            marker=dict(size=6, color='#fbbf24')
-        ))
-
-        fig.add_trace(go.Scatter(
-            x=df_chart['Date'].astype(str),
-            y=df_chart['Start Bal.'] + df_chart['Target P&L'],
-            mode='lines',
-            name='Target End Bal',
-            line=dict(color='#34d399', width=2, dash='dash')
-        ))
-        
-        if not df_chart.empty:
-            min_bal = df_chart[['End Bal.', 'Start Bal.']].min().min()
-            max_bal = df_chart[['End Bal.', 'Start Bal.']].max().max()
-            padding = (max_bal - min_bal) * 0.1 
-            y_range = [max(0, min_bal - padding), max_bal + padding]
-        else:
-            y_range = [0, 100]
-
-
-        fig.update_layout(
-            title='Balance Progression Over Time',
-            xaxis_title="Date", 
-            yaxis_title="Balance ($)",
-            hovermode='x unified',
-            height=450,
-            plot_bgcolor='#0f1419', 
-            paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(family="Inter, sans-serif", size=12, color="#e8f5e9"),
-            title_font=dict(size=20, color='#00ff88', family="Inter"),
-            legend=dict(
-                orientation="h", 
-                yanchor="bottom", y=1.02, xanchor="right", x=1, 
-                bgcolor='rgba(0,0,0,0)',
-                font=dict(color="#e8f5e9")
-            ),
-            xaxis=dict(
-                showgrid=True, 
-                gridcolor='rgba(0, 255, 136, 0.1)',
-                tickfont=dict(color='#e8f5e9'),
-                tickformat="%b %d<br>%Y",
-                dtick='d' 
-            ),
-            yaxis=dict(
-                showgrid=True, 
-                gridcolor='rgba(0, 255, 136, 0.1)',
-                tickfont=dict(color='#e8f5e9'),
-                autorange=False, 
-                range=y_range 
-            ),
-            margin=dict(t=50) 
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
 
     ###
         # --- Trade Breakdown Section (Date Filter) ---
@@ -991,6 +915,83 @@ with tab2:
 
             # --- Display chart ---
             st.plotly_chart(fig_daily, width="stretch")
+
+            st.subheader("📈 Balance Progression")
+        
+            df_chart = df_summary.sort_values(by='Date', ascending=True)
+
+            fig = go.Figure()
+            
+            fig.add_trace(go.Scatter(
+                x=df_chart['Date'].astype(str),
+                y=df_chart['End Bal.'],
+                mode='lines+markers',
+                name='End Balance',
+                line=dict(color='#00ff88', width=3, shape='spline'),
+                marker=dict(size=8, color='#00d97e', line=dict(color='#0a0e0f', width=2)),
+                fill='tozeroy',
+                fillcolor='rgba(0, 255, 136, 0.1)'
+            ))
+            
+            fig.add_trace(go.Scatter(
+                x=df_chart['Date'].astype(str),
+                y=df_chart['Start Bal.'],
+                mode='lines+markers',
+                name='Start Balance',
+                line=dict(color='#fbbf24', width=2, dash='dot'), 
+                marker=dict(size=6, color='#fbbf24')
+            ))
+
+            fig.add_trace(go.Scatter(
+                x=df_chart['Date'].astype(str),
+                y=df_chart['Start Bal.'] + df_chart['Target P&L'],
+                mode='lines',
+                name='Target End Bal',
+                line=dict(color='#34d399', width=2, dash='dash')
+            ))
+            
+            if not df_chart.empty:
+                min_bal = df_chart[['End Bal.', 'Start Bal.']].min().min()
+                max_bal = df_chart[['End Bal.', 'Start Bal.']].max().max()
+                padding = (max_bal - min_bal) * 0.1 
+                y_range = [max(0, min_bal - padding), max_bal + padding]
+            else:
+                y_range = [0, 100]
+
+
+            fig.update_layout(
+                title='Balance Progression Over Time',
+                xaxis_title="Date", 
+                yaxis_title="Balance ($)",
+                hovermode='x unified',
+                height=450,
+                plot_bgcolor='#0f1419', 
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(family="Inter, sans-serif", size=12, color="#e8f5e9"),
+                title_font=dict(size=20, color='#00ff88', family="Inter"),
+                legend=dict(
+                    orientation="h", 
+                    yanchor="bottom", y=1.02, xanchor="right", x=1, 
+                    bgcolor='rgba(0,0,0,0)',
+                    font=dict(color="#e8f5e9")
+                ),
+                xaxis=dict(
+                    showgrid=True, 
+                    gridcolor='rgba(0, 255, 136, 0.1)',
+                    tickfont=dict(color='#e8f5e9'),
+                    tickformat="%b %d<br>%Y",
+                    dtick='d' 
+                ),
+                yaxis=dict(
+                    showgrid=True, 
+                    gridcolor='rgba(0, 255, 136, 0.1)',
+                    tickfont=dict(color='#e8f5e9'),
+                    autorange=False, 
+                    range=y_range 
+                ),
+                margin=dict(t=50) 
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
 
 
