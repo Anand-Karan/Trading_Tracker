@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime
+from datetime import datetime, timedelta
 import gspread
 
 # --- Page Configuration ---
@@ -256,6 +256,16 @@ st.markdown("""
     ::-webkit-scrollbar-thumb:hover {
         background: linear-gradient(135deg, #8b5cf6, #a78bfa);
     }
+    
+    /* Custom style for the progress bar text */
+    [data-testid="stProgress"] > div > div > div > div:first-child {
+        font-weight: 600;
+        color: #f8fafc; /* White text on progress bar */
+    }
+
+    /* Custom color for progress bar based on performance (requires more advanced CSS/JS, 
+       but for simplicity, we stick to Streamlit's default and use text to communicate status) */
+
     </style>
 """, unsafe_allow_html=True)
 
@@ -377,11 +387,12 @@ def recalculate_all_summaries(initial_balance=2283.22):
         
         start_balance = current_balance
         end_balance = start_balance + total_pl
-        target_pl = start_balance * 0.065
+        target_pl = start_balance * 0.065 # 6.5% target
         
         if start_balance <= 0:
              target_pl = 0
         
+        # Use isocalendar for week number
         week_num = datetime.combine(date, datetime.min.time()).isocalendar()[1]
              
         daily_summary_list.append({
@@ -399,6 +410,7 @@ def recalculate_all_summaries(initial_balance=2283.22):
 
     df_summary = pd.DataFrame(daily_summary_list)
     
+    # Re-integrate deposits/bonuses from the old summary
     df_old_summary = get_data_from_sheet('daily_summary')
     if not df_old_summary.empty:
         df_old_summary['Date'] = pd.to_datetime(df_old_summary['Date'], errors='coerce').dt.date.astype(str)
@@ -408,9 +420,37 @@ def recalculate_all_summaries(initial_balance=2283.22):
         
         df_merged['Deposit/Bonus'] = pd.to_numeric(df_merged['Deposit/Bonus_old'], errors='coerce').fillna(0.00)
         
-        df_merged['End Bal.'] = pd.to_numeric(df_merged['End Bal.'], errors='coerce').fillna(0) + df_merged['Deposit/Bonus']
-        
         df_summary = df_merged[['Date', 'Week', 'Trades', 'Start Bal.', 'Target P&L', 'Actual P&L', 'Deposit/Bonus', 'End Bal.']]
+        
+        # Recalculate balances with Deposit/Bonus applied
+        current_balance_recalc = initial_balance
+        new_summary_list = []
+        for index, row in df_summary.iterrows():
+            deposit = row['Deposit/Bonus']
+            
+            # Use the calculated P&L from trades for the day
+            actual_pl = row['Actual P&L'] 
+            
+            start_balance = current_balance_recalc
+            end_balance = start_balance + actual_pl + deposit # Deposit/Bonus impacts the ending balance
+            target_pl = start_balance * 0.065
+            if start_balance <= 0:
+                 target_pl = 0
+            
+            new_summary_list.append({
+                'Date': row['Date'],
+                'Week': row['Week'],
+                'Trades': row['Trades'],
+                'Start Bal.': round(start_balance, 2),
+                'Target P&L': round(target_pl, 2),
+                'Actual P&L': round(actual_pl, 2),
+                'Deposit/Bonus': round(deposit, 2),
+                'End Bal.': round(end_balance, 2),
+            })
+            current_balance_recalc = end_balance 
+        
+        df_summary = pd.DataFrame(new_summary_list)
+        
     else:
         df_summary['Date'] = df_summary['Date'].astype(str)
 
@@ -431,11 +471,18 @@ def load_data():
     if not df_summary.empty:
         try:
             if 'Date' in df_summary.columns:
-                df_summary['Date'] = pd.to_datetime(df_summary['Date'], errors='coerce')
-            if 'End Bal.' in df_summary.columns:
-                df_summary['End Bal.'] = pd.to_numeric(df_summary['End Bal.'], errors='coerce').fillna(0)
-            if 'Actual P&L' in df_summary.columns:
-                df_summary['Actual P&L'] = pd.to_numeric(df_summary['Actual P&L'], errors='coerce').fillna(0)
+                # Convert to datetime.date object for easy comparison
+                df_summary['Date'] = pd.to_datetime(df_summary['Date'], errors='coerce').dt.date
+            
+            # Ensure all numeric columns are correctly typed
+            numeric_cols = ['Start Bal.', 'Target P&L', 'Actual P&L', 'Deposit/Bonus', 'End Bal.']
+            for col in numeric_cols:
+                if col in df_summary.columns:
+                     df_summary[col] = pd.to_numeric(df_summary[col], errors='coerce').fillna(0)
+            
+            # Sort for clean display/charting
+            df_summary = df_summary.sort_values(by='Date')
+
         except Exception as e:
             st.warning(f"Could not convert summary data types: {e}")
             df_summary = pd.DataFrame()
@@ -443,7 +490,8 @@ def load_data():
     if not df_trades.empty:
         try:
             if 'trade_date' in df_trades.columns:
-                df_trades['trade_date'] = pd.to_datetime(df_trades['trade_date'], errors='coerce')
+                # Convert to datetime.date object for filtering
+                df_trades['trade_date'] = pd.to_datetime(df_trades['trade_date'], errors='coerce').dt.date
             if 'pnl' in df_trades.columns:
                 df_trades['pnl'] = pd.to_numeric(df_trades['pnl'], errors='coerce').fillna(0)
             if 'pnl_pct' in df_trades.columns:
@@ -466,10 +514,14 @@ if 'initial_balance' not in st.session_state:
 
 df_summary, df_trades = load_data()
 
-if df_summary.empty and not df_trades.empty:
-    recalculate_all_summaries(st.session_state.initial_balance)
-    df_summary, df_trades = load_data()
-elif df_summary.empty and df_trades.empty:
+# Find the true starting balance from the first day's summary
+if not df_summary.empty and 'Start Bal.' in df_summary.columns:
+    # Use the Start Bal from the first recorded trading day as the initial balance for stats
+    first_start_bal = df_summary['Start Bal.'].iloc[0] 
+    st.session_state.initial_balance = first_start_bal
+    
+# Initial recalculation if data is missing
+if df_summary.empty or (df_summary.shape[0] == 1 and df_trades.empty):
     recalculate_all_summaries(st.session_state.initial_balance)
     df_summary, df_trades = load_data()
 
@@ -481,9 +533,6 @@ with st.sidebar:
     
     current_balance = df_summary['End Bal.'].iloc[-1] if not df_summary.empty else st.session_state.initial_balance
     
-    if not df_summary.empty and 'Start Bal.' in df_summary.columns:
-        first_start_bal = pd.to_numeric(df_summary['Start Bal.'], errors='coerce').iloc[0]
-        st.session_state.initial_balance = first_start_bal
     
     st.metric(
         label="💰 Current Balance",
@@ -567,8 +616,54 @@ st.markdown("# 📈 Trading Performance Tracker")
 
 tab1, tab2, tab3 = st.tabs(["💵 Trade Entry", "🗓️ Daily Summary", "📊 Analytics"])
 
-# --- Tab 1: Trade Entry Form ---
+# --- Tab 1: Trade Entry Form (with Progress Bar) ---
 with tab1:
+    
+    # === Today's Performance Snapshot ===
+    st.subheader("🎯 Today's Performance Snapshot")
+
+    # 1. Get Today's Date Object (since df_summary['Date'] is datetime.date)
+    today_date_obj = datetime.now().date()
+
+    # 2. Find Today's Summary Row
+    df_today = df_summary[df_summary['Date'] == today_date_obj]
+
+    if not df_today.empty:
+        today_target_pl = df_today['Target P&L'].iloc[0]
+        today_actual_pl = df_today['Actual P&L'].iloc[0]
+        
+        # Only calculate the bar fill if there was a target
+        if today_target_pl > 0:
+            # Calculate fill ratio: 
+            fill_ratio = today_actual_pl / today_target_pl 
+            
+            # Determine label and color text
+            if today_actual_pl >= today_target_pl:
+                label_text = f"**Target HIT!** (P&L: ${today_actual_pl:,.2f})"
+                # st.progress doesn't allow custom color, but we use the text to communicate
+            elif today_actual_pl > 0:
+                label_text = f"**Making Progress:** {min(100, fill_ratio*100):.1f}% of Target (P&L: ${today_actual_pl:,.2f})"
+            else: # Loss or Breakeven
+                label_text = f"**Loss/Behind Target:** (P&L: ${today_actual_pl:,.2f})"
+                
+            st.info(f"**Target P&L for Today:** `${today_target_pl:,.2f}`")
+            
+            # Display Progress Bar. Streamlit progress bar value goes from 0 to 100.
+            # We cap it at 100 for visual consistency but use the label to show over-performance.
+            st.progress(
+                value=min(100, int(fill_ratio * 100)), 
+                text=label_text 
+            )
+            
+        else:
+            st.info(f"Today's P&L: **${today_actual_pl:,.2f}** (Target P&L calculation resulted in $0.00).")
+
+    else:
+        st.info("No summary data for today yet. Your first trade will establish today's entry and target.")
+
+    st.markdown("---") 
+    # === END NEW CODE ===
+    
     st.header("Log a New Trade")
     
     with st.form("Trade Entry Form"):
@@ -615,14 +710,13 @@ with tab1:
                     
                     recalculate_all_summaries(st.session_state.initial_balance)
                     
-                    # Only clear cache, don't use rerun - let the cache refresh handle it
-                    st.cache_data.clear()
+                    # Rerun to refresh the data and the progress bar
                     st.rerun()
                 else:
                     st.error("❌ Failed to log trade to Google Sheet.")
 
 
-# --- Tab 2: Daily Summary ---
+# --- Tab 2: Daily Summary (with Enhanced Plot) ---
 with tab2:
     st.header("Daily Summary")
     
@@ -631,21 +725,17 @@ with tab2:
     else:
         df_display = df_summary.copy()
         
-        # Ensure Date column exists and is datetime
+        # Sort by Date and convert back to string for clean table display
         if 'Date' in df_display.columns:
-            df_display['Date'] = pd.to_datetime(df_display['Date'], errors='coerce')
-            
-            # Sort by Date
             df_display = df_display.sort_values(by='Date', ascending=False)
-            
-            # Format date for display
-            df_display['Date'] = df_display['Date'].dt.strftime('%Y-%m-%d')
+            df_display['Date'] = df_display['Date'].astype(str)
         
         # Format currency columns
         currency_cols = ['Start Bal.', 'Target P&L', 'Actual P&L', 'Deposit/Bonus', 'End Bal.']
         for col in currency_cols:
              if col in df_display.columns:
-                df_display[col] = pd.to_numeric(df_display[col], errors='coerce').apply(lambda x: f"${x:,.2f}" if pd.notna(x) else '$0.00')
+                # Use .fillna(0) before applying the lambda to ensure all values are numeric for clean formatting
+                df_display[col] = pd.to_numeric(df_display[col], errors='coerce').fillna(0).apply(lambda x: f"${x:,.2f}")
 
         cols_to_keep = ['Date', 'Week', 'Trades', 'Start Bal.', 'Target P&L', 'Actual P&L', 'Deposit/Bonus', 'End Bal.']
         df_display = df_display[[col for col in cols_to_keep if col in df_display.columns]]
@@ -662,15 +752,38 @@ with tab2:
 
         fig = go.Figure()
         
+        # === ENHANCED PLOT TRACES ===
+        
+        # 1. End Balance (Solid Line & Area)
         fig.add_trace(go.Scatter(
-            x=df_chart['Date'],
+            x=df_chart['Date'].astype(str),
             y=df_chart['End Bal.'],
             mode='lines+markers',
-            name='Balance',
+            name='End Balance',
             line=dict(color='#818cf8', width=3, shape='spline'),
             marker=dict(size=8, color='#a78bfa', line=dict(color='#312e81', width=2)),
             fill='tozeroy',
             fillcolor='rgba(129, 140, 248, 0.2)'
+        ))
+        
+        # 2. Start Balance (Dotted Line)
+        fig.add_trace(go.Scatter(
+            x=df_chart['Date'].astype(str),
+            y=df_chart['Start Bal.'],
+            mode='lines+markers',
+            name='Start Balance',
+            line=dict(color='#facc15', width=2, dash='dot'), # Yellow, Dotted
+            marker=dict(size=6, color='#fcd34d')
+        ))
+
+        # 3. Target End Balance (Dashed Line)
+        # Calculates the Balance if the daily target was hit
+        fig.add_trace(go.Scatter(
+            x=df_chart['Date'].astype(str),
+            y=df_chart['Start Bal.'] + df_chart['Target P&L'],
+            mode='lines',
+            name='Target End Bal',
+            line=dict(color='#10b981', width=2, dash='dash') # Green, Dashed
         ))
         
         fig.update_layout(
@@ -683,6 +796,7 @@ with tab2:
             paper_bgcolor='rgba(0,0,0,0)',
             font=dict(family="Inter, sans-serif", size=12, color="#e0e7ff"),
             title_font=dict(size=20, color='#f8fafc', family="Inter"),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, bgcolor='rgba(0,0,0,0)'), # Added legend config
             xaxis=dict(
                 showgrid=True, 
                 gridcolor='rgba(99, 102, 241, 0.1)',
@@ -696,7 +810,7 @@ with tab2:
         )
         st.plotly_chart(fig, use_container_width=True)
 
-# --- Tab 3: Performance Analytics ---
+# --- Tab 3: Performance Analytics (with Date Filter) ---
 with tab3:
     st.header("Performance Analytics")
     
@@ -704,78 +818,117 @@ with tab3:
         st.info("ℹ️ No trade data yet. Start logging trades to see analytics!")
     else:
         
-        col_pnl, col_winrate = st.columns(2)
+        # === NEW: Date Filter ===
+        all_dates = df_summary['Date'].unique()
+        min_date = min(all_dates) if len(all_dates) > 0 else datetime.now().date()
+        max_date = max(all_dates) if len(all_dates) > 0 else datetime.now().date()
         
-        with col_pnl:
-            st.subheader("💵 Daily P&L Chart")
+        col_start_date, col_end_date = st.columns(2)
+        
+        with col_start_date:
+            start_date = st.date_input("Start Date", value=min_date, min_value=min_date, max_value=max_date)
+        
+        with col_end_date:
+            end_date = st.date_input("End Date", value=max_date, min_value=min_date, max_value=max_date)
+
+        if start_date > end_date:
+            st.error("❌ Error: Start Date must be before or the same as End Date.")
+            # Set filter dataframes to empty to prevent errors
+            df_summary_filtered = pd.DataFrame()
+            df_trades_filtered = pd.DataFrame()
+        else:
+            # Filter the summary data
+            df_summary_filtered = df_summary[
+                (df_summary['Date'] >= start_date) & 
+                (df_summary['Date'] <= end_date)
+            ]
             
-            df_chart_pnl = df_summary.sort_values(by='Date', ascending=True)
+            # Filter the trades data
+            df_trades_filtered = df_trades[
+                (df_trades['trade_date'] >= start_date) & 
+                (df_trades['trade_date'] <= end_date)
+            ]
+
+        st.markdown("---")
+        
+        if df_summary_filtered.empty or df_trades_filtered.empty:
+            st.info("ℹ️ No trading data found for the selected date range.")
             
-            colors = ['#34d399' if x > 0 else '#f87171' for x in df_chart_pnl['Actual P&L']]
+        else:
+            col_pnl, col_winrate = st.columns(2)
             
-            fig_pnl = go.Figure()
-            
-            fig_pnl.add_trace(go.Bar(
-                x=df_chart_pnl['Date'],
-                y=df_chart_pnl['Actual P&L'],
-                marker_color=colors,
-                name='Daily P&L',
-                text=df_chart_pnl['Actual P&L'].apply(lambda x: f'${x:,.2f}'),
-                textposition='outside',
-                textfont=dict(color='#f8fafc', size=11),
-                marker=dict(line=dict(color='rgba(99, 102, 241, 0.3)', width=1))
-            ))
-            
-            fig_pnl.update_layout(
-                title='Daily Trading Profit/Loss',
-                xaxis_title="Date", 
-                yaxis_title="P&L ($)",
-                height=450,
-                plot_bgcolor='rgba(30, 41, 59, 0.5)',
-                paper_bgcolor='rgba(0,0,0,0)',
-                font=dict(family="Inter, sans-serif", size=12, color="#e0e7ff"),
-                title_font=dict(size=18, color='#f8fafc', family="Inter"),
-                xaxis=dict(
-                    showgrid=True, 
-                    gridcolor='rgba(99, 102, 241, 0.1)',
-                    tickfont=dict(color='#cbd5e1')
-                ),
-                yaxis=dict(
-                    showgrid=True, 
-                    gridcolor='rgba(99, 102, 241, 0.1)', 
-                    zeroline=True, 
-                    zerolinecolor='rgba(139, 92, 246, 0.3)',
-                    tickfont=dict(color='#cbd5e1')
+            # --- Daily P&L Chart ---
+            with col_pnl:
+                st.subheader("💵 Daily P&L Chart")
+                
+                df_chart_pnl = df_summary_filtered.sort_values(by='Date', ascending=True)
+                
+                colors = ['#34d399' if x > 0 else '#f87171' for x in df_chart_pnl['Actual P&L']]
+                
+                fig_pnl = go.Figure()
+                
+                fig_pnl.add_trace(go.Bar(
+                    x=df_chart_pnl['Date'].astype(str),
+                    y=df_chart_pnl['Actual P&L'],
+                    marker_color=colors,
+                    name='Daily P&L',
+                    text=df_chart_pnl['Actual P&L'].apply(lambda x: f'${x:,.2f}'),
+                    textposition='outside',
+                    textfont=dict(color='#f8fafc', size=11),
+                    marker=dict(line=dict(color='rgba(99, 102, 241, 0.3)', width=1))
+                ))
+                
+                fig_pnl.update_layout(
+                    title=f'Daily Trading P&L ({start_date.strftime("%b %d")} - {end_date.strftime("%b %d")})',
+                    xaxis_title="Date", 
+                    yaxis_title="P&L ($)",
+                    height=450,
+                    plot_bgcolor='rgba(30, 41, 59, 0.5)',
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    font=dict(family="Inter, sans-serif", size=12, color="#e0e7ff"),
+                    title_font=dict(size=18, color='#f8fafc', family="Inter"),
+                    xaxis=dict(
+                        showgrid=True, 
+                        gridcolor='rgba(99, 102, 241, 0.1)',
+                        tickfont=dict(color='#cbd5e1')
+                    ),
+                    yaxis=dict(
+                        showgrid=True, 
+                        gridcolor='rgba(99, 102, 241, 0.1)', 
+                        zeroline=True, 
+                        zerolinecolor='rgba(139, 92, 246, 0.3)',
+                        tickfont=dict(color='#cbd5e1')
+                    )
                 )
-            )
-            st.plotly_chart(fig_pnl, use_container_width=True)
-            
-        with col_winrate:
-            st.subheader("🎯 Trade Win/Loss Breakdown")
-            
-            df_trades_temp = df_trades.copy()
-            df_trades_temp['Result'] = df_trades_temp['pnl'].apply(lambda x: 'Win' if x > 0 else ('Loss' if x < 0 else 'Breakeven'))
-            
-            result_counts = df_trades_temp['Result'].value_counts().reset_index()
-            result_counts.columns = ['Result', 'Count']
-            
-            fig_pie = go.Figure(data=[go.Pie(
-                labels=result_counts['Result'],
-                values=result_counts['Count'],
-                hole=0.4,
-                marker=dict(colors=['#34d399', '#f87171', '#818cf8']),
-                textfont=dict(size=16, color='white', family='Inter'),
-                textinfo='label+percent'
-            )])
-            
-            fig_pie.update_layout(
-                title='Total Trade Outcomes',
-                height=450,
-                plot_bgcolor='rgba(0,0,0,0)',
-                paper_bgcolor='rgba(0,0,0,0)',
-                font=dict(family="Inter, sans-serif", size=12, color="#e0e7ff"),
-                title_font=dict(size=18, color='#f8fafc', family="Inter"),
-                showlegend=True,
-                legend=dict(font=dict(color='#e0e7ff'))
-            )
-            st.plotly_chart(fig_pie, use_container_width=True)
+                st.plotly_chart(fig_pnl, use_container_width=True)
+                
+            # --- Trade Win/Loss Breakdown ---
+            with col_winrate:
+                st.subheader("🎯 Trade Win/Loss Breakdown")
+                
+                df_trades_temp = df_trades_filtered.copy()
+                df_trades_temp['Result'] = df_trades_temp['pnl'].apply(lambda x: 'Win' if x > 0 else ('Loss' if x < 0 else 'Breakeven'))
+                
+                result_counts = df_trades_temp['Result'].value_counts().reset_index()
+                result_counts.columns = ['Result', 'Count']
+                
+                fig_pie = go.Figure(data=[go.Pie(
+                    labels=result_counts['Result'],
+                    values=result_counts['Count'],
+                    hole=0.4,
+                    marker=dict(colors=['#34d399', '#f87171', '#818cf8']),
+                    textfont=dict(size=16, color='white', family='Inter'),
+                    textinfo='label+percent'
+                )])
+                
+                fig_pie.update_layout(
+                    title=f'Trade Outcomes ({df_trades_filtered.shape[0]} trades total)',
+                    height=450,
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    font=dict(family="Inter, sans-serif", size=12, color="#e0e7ff"),
+                    title_font=dict(size=18, color='#f8fafc', family="Inter"),
+                    showlegend=True,
+                    legend=dict(font=dict(color='#e0e7ff'))
+                )
+                st.plotly_chart(fig_pie, use_container_width=True)
