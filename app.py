@@ -893,6 +893,11 @@ with tab2:
             st.info(f"ℹ️ No trades logged for today, {today_date_obj.strftime('%Y-%m-%d')}.")
         else:
             
+            # --- Defensive Data Cleaning (Critical Fix) ---
+            # Ensure P&L is numeric and no NaN values exist before calculations
+            df_trades_today['pnl'] = pd.to_numeric(df_trades_today['pnl'], errors='coerce').fillna(0)
+            # -----------------------------------------------
+            
             df_trades_today['Trade #'] = range(1, len(df_trades_today) + 1)
             colors_today = ['#00ff88' if x > 0 else '#ff4757' for x in df_trades_today['pnl']]
             
@@ -927,22 +932,12 @@ with tab2:
             ))
             
             # Calculate max absolute P&L and Running P&L for symmetrical axis range
-            # max_pnl = df_trades_today['pnl'].abs().max()
-            # max_running = df_trades_today['Running P&L'].abs().max()
-            
-            # y_max = max(max_pnl, max_running) * 1.1
-
-            # # FIX: Prevent Plotly error when all P&L values are zero
-            # if y_max == 0:
-            #     y_max = 1.0 # Sets a minimal range of [-1.0, 1.0]
-            # Calculate max absolute P&L and Running P&L for symmetrical axis range
             max_pnl = df_trades_today['pnl'].abs().max()
             max_running = df_trades_today['Running P&L'].abs().max()
             
             y_max = max(max_pnl, max_running) * 1.1
 
-            # --- ROBUST FIX: Ensure y_max is a positive, finite number ---
-            # This handles NaN/Inf from data issues AND the case where P&L is exactly 0.
+            # --- ROBUST FIX: Ensure y_max is a positive, finite number (handles NaN, Inf, and 0) ---
             if pd.isna(y_max) or y_max <= 0:
                 y_max = 1.0 # Sets a minimal safe range of [-1.0, 1.0]
 
