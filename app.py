@@ -881,6 +881,9 @@ with tab2:
 
 
     
+        # Existing Balance Progression chart ends here: st.plotly_chart(fig, use_container_width=True)
+
+
         st.subheader("🗓️ Today's Trade Breakdown (CST/CDT)")
         
         today_date_obj = datetime.now(CENTRAL_TZ).date()
@@ -923,9 +926,15 @@ with tab2:
                 marker=dict(size=6, color='#fbbf24')
             ))
             
+            # Calculate max absolute P&L and Running P&L for symmetrical axis range
             max_pnl = df_trades_today['pnl'].abs().max()
             max_running = df_trades_today['Running P&L'].abs().max()
-            y_max = max(max_pnl, max_running) * 1.1 if max_running > 0 else max_pnl * 1.5
+            
+            y_max = max(max_pnl, max_running) * 1.1
+
+            # FIX: Prevent Plotly error when all P&L values are zero
+            if y_max == 0:
+                y_max = 1.0 # Sets a minimal range of [-1.0, 1.0]
 
             fig_daily.update_layout(
                 title=f"Today's Individual Trade P&L ({today_date_obj.strftime('%Y-%m-%d')})",
