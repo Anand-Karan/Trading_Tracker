@@ -18,18 +18,20 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- Custom CSS for Robinhood Dark Green Styling ---
+# --- Custom CSS for Subtle Robinhood Dark Green Styling ---
 st.markdown("""
     <style>
     /* Import Google Fonts */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+    @import url('https://fonts.com/css2?family=Inter:wght@400;600;700;800&display=swap');
     
-    /* --- COLOR PALETTE (Robinhood Inspired) --- */
-    /* BG Primary: #17191e */
-    /* BG Secondary: #212328 */
-    /* Accent Green: #00C800 (Vibrant Green) */
-    /* Accent Red: #FF5353 (Vibrant Red) */
+    /* --- REFINED COLOR PALETTE (Subtle Dark Green) --- */
+    /* BG Primary: #17191e (Charcoal Black) */
+    /* BG Secondary: #212328 (Dark Card/Panel) */
+    /* Accent Green: #1ADF6A (Muted, but distinct green for success) */
+    /* Accent Red: #FF5353 (Vibrant Red for loss/danger) */
     /* Text Light: #E0E7FF */
+    /* Title Text: #CBD5E1 (Soft White/Gray) */
+    /* Sidebar Title: #E0E7FF */
 
     /* Main background and theme */
     .main {
@@ -38,45 +40,45 @@ st.markdown("""
         font-family: 'Inter', sans-serif;
     }
     
+    /* Content Blocks/Cards */
     .block-container {
         padding-top: 2rem;
         padding-bottom: 2rem;
-        background: rgba(33, 35, 40, 0.8); /* Slightly lighter background for content blocks */
+        background: rgba(33, 35, 40, 0.9); /* Slightly lighter background for content blocks */
         backdrop-filter: blur(5px);
         border-radius: 12px;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
-        border: 1px solid rgba(0, 200, 0, 0.1); /* Subtle green border */
+        border: 1px solid rgba(26, 223, 106, 0.1); /* Subtle green border */
         margin: 1rem auto;
     }
     
-    /* Header styling */
+    /* H1 Header styling (Main Title) */
     h1 {
-        color: #f8fafc;
+        /* Subdued, high-contrast title */
+        color: #f8fafc; /* Near white */
         font-weight: 800;
         font-size: 3rem !important;
         text-align: center;
         margin-bottom: 2rem;
-        background: linear-gradient(135deg, #00C800, #3AD866); /* Vibrant green gradient */
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        text-shadow: 0 0 10px rgba(0, 200, 0, 0.3);
+        text-shadow: 0 0 5px rgba(26, 223, 106, 0.3); /* Subtle green glow */
     }
     
+    /* H2/H3 styling (Subtitles) - toned down green highlight */
     h2, h3 {
-        color: #E0E7FF;
+        color: #CBD5E1; /* Soft white/gray for readability */
         font-weight: 700;
     }
     
     /* Sidebar styling */
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #17191e 0%, #292c31 100%);
-        border-right: 1px solid rgba(0, 200, 0, 0.2);
+        border-right: 1px solid rgba(26, 223, 106, 0.2);
     }
     
+    /* Sidebar Title: Made lighter for better contrast */
     [data-testid="stSidebar"] h3 {
-        color: #f8fafc !important;
-        text-shadow: 0 0 5px rgba(0, 200, 0, 0.5);
+        color: #E0E7FF !important; /* Lighter white for visibility */
+        text-shadow: 0 0 5px rgba(26, 223, 106, 0.2);
     }
     
     /* Metric cards styling */
@@ -88,7 +90,7 @@ st.markdown("""
     
     /* Positive delta (Profit) */
     [data-testid="stMetricDelta"] {
-        color: #00C800; /* Vibrant Green */
+        color: #1ADF6A; /* Muted Accent Green */
     }
     
     /* Negative delta (Loss) */
@@ -105,7 +107,7 @@ st.markdown("""
         background-color: #212328; 
         border-radius: 8px;
         padding: 0.3rem;
-        border: 1px solid rgba(0, 200, 0, 0.1);
+        border: 1px solid rgba(26, 223, 106, 0.1);
     }
     
     .stTabs [data-baseweb="tab"] {
@@ -115,11 +117,12 @@ st.markdown("""
         transition: all 0.2s ease;
     }
     
+    /* Active Tab - uses the toned-down green */
     .stTabs [aria-selected="true"] {
-        background: #00C800 !important; /* Solid vibrant green for active tab */
+        background: #1ADF6A !important; /* Muted green for active tab */
         color: #17191e !important; /* Dark text on green tab */
         font-weight: 700;
-        box-shadow: 0 2px 10px rgba(0, 200, 0, 0.5);
+        box-shadow: 0 2px 10px rgba(26, 223, 106, 0.5);
     }
     
     /* Form styling */
@@ -127,37 +130,37 @@ st.markdown("""
         background: #212328;
         border-radius: 10px;
         padding: 1.5rem;
-        border: 1px solid rgba(0, 200, 0, 0.1);
+        border: 1px solid rgba(26, 223, 106, 0.1);
     }
     
     /* Input fields */
     .stTextInput input, .stNumberInput input, .stSelectbox div, .stDateInput input {
         background-color: #292c31 !important;
         color: #E0E7FF !important;
-        border: 1px solid rgba(0, 200, 0, 0.3) !important;
+        border: 1px solid rgba(26, 223, 106, 0.3) !important;
         border-radius: 6px;
         transition: all 0.2s ease;
     }
     
     .stTextInput input:focus, .stNumberInput input:focus, .stSelectbox div:focus, .stDateInput input:focus {
-        border-color: #00C800 !important;
-        box-shadow: 0 0 0 3px rgba(0, 200, 0, 0.2) !important;
+        border-color: #1ADF6A !important;
+        box-shadow: 0 0 0 3px rgba(26, 223, 106, 0.2) !important;
     }
     
     .stTextInput label, .stNumberInput label, .stSelectbox label, .stDateInput label {
-        color: #E0E7FF !important;
+        color: #CBD5E1 !important; /* Soft white/gray */
     }
     
     /* Button styling (Primary: Green, Secondary: Red) */
     .stButton button[kind="primary"] {
-        background-color: #00C800; /* Vibrant Green */
+        background-color: #1ADF6A; /* Muted Accent Green */
         color: #17191e;
         font-weight: 700;
         border: none;
-        box-shadow: 0 4px 15px rgba(0, 200, 0, 0.4);
+        box-shadow: 0 4px 15px rgba(26, 223, 106, 0.4);
     }
     .stButton button[kind="primary"]:hover {
-        background-color: #3AD866;
+        background-color: #4BD480;
         transform: translateY(-1px);
     }
     
@@ -174,9 +177,9 @@ st.markdown("""
 
     /* Success/Error messages */
     .stSuccess {
-        background-color: rgba(0, 200, 0, 0.2);
-        color: #00C800;
-        border-left: 4px solid #00C800;
+        background-color: rgba(26, 223, 106, 0.2);
+        color: #1ADF6A;
+        border-left: 4px solid #1ADF6A;
     }
     
     .stError {
@@ -185,47 +188,32 @@ st.markdown("""
         border-left: 4px solid #FF5353;
     }
     
-    /* Info box */
+    /* Info box - using a subtle green for background and border */
     .stInfo {
-        background: rgba(0, 200, 0, 0.1);
-        border-left: 4px solid #00C800;
-        color: #E0E7FF;
-    }
-    
-    /* Chart containers */
-    .js-plotly-plot {
-        border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-        background: #212328;
-        padding: 1rem;
+        background: rgba(26, 223, 106, 0.1);
+        border-left: 4px solid #1ADF6A;
+        color: #CBD5E1; /* Soft white/gray text */
     }
     
     /* Divider */
     hr {
-        background: rgba(0, 200, 0, 0.1);
+        background: rgba(26, 223, 106, 0.1);
     }
 
-    /* Custom style for the progress bar */
     /* Progress bar track (background) */
     .stProgress > div > div > div:first-child {
         background-color: #292c31 !important; 
         border-radius: 5px;
     }
     
-    /* Custom color logic for the progress fill */
+    /* Progress bar fill colors (controlled dynamically in Python, but base styles here) */
     .stProgress > div > div > div > div {
-        /* Default to success color (Green) */
-        background-color: #00C800 !important;
-    }
-
-    /* Style for loss state in the progress bar (Red) */
-    .stProgress.loss > div > div > div > div {
-        background-color: #FF5353 !important; 
+        background-color: #1ADF6A !important; /* Muted green default */
     }
     
-    /* Style for progress state in the progress bar (Subtle Green) */
-    .stProgress.progress > div > div > div > div {
-        background-color: #00C800 !important; /* Keep it vibrant green for progress */
+    /* Special fix for the text input label in the sidebar danger zone */
+    [data-testid="stSidebar"] [data-testid="stTextInput"] label {
+        color: #FF5353 !important;
     }
 
     </style>
@@ -614,33 +602,38 @@ with tab1:
             
             # --- Determine State and Style ---
             progress_css_class = ""
+            # Define colors for dynamic use in the progress bar
+            GREEN_COLOR = '#1ADF6A' # Muted Green
+            RED_COLOR = '#FF5353'
+
             if today_actual_pl >= today_target_pl:
                 # Target HIT!
                 fill_ratio = 1.0
                 fill_value = 100
                 label_text = f"**Target HIT!** (P&L: ${today_actual_pl:,.2f})"
-                progress_css_class = "" # Uses default green from CSS
+                bar_color = GREEN_COLOR
                 
             elif today_actual_pl > 0:
                 # Making Progress
                 fill_ratio = today_actual_pl / today_target_pl 
                 fill_value = int(fill_ratio * 100)
                 label_text = f"**Making Progress:** {fill_value:.1f}% of Target (P&L: ${today_actual_pl:,.2f})"
-                progress_css_class = "progress" # Uses green class
+                bar_color = GREEN_COLOR
                 
             else: # Loss or Breakeven (Actual P&L <= 0)
                 # Loss/Behind Target
                 fill_value = 0 
                 label_text = f"**LOSS/Behind Target:** (P&L: ${today_actual_pl:,.2f})"
-                progress_css_class = "loss" # Uses red class
+                bar_color = RED_COLOR
                 
             # Embed custom CSS for coloring the bar based on loss/progress/hit
+            # This is crucial for overriding Streamlit's default progress bar color
             st.markdown(
                 f"""
                 <style>
                 /* Inject custom CSS class to control the bar color */
                 .stProgress > div > div > div > div {{
-                    background-color: {'#FF5353' if progress_css_class == 'loss' else ('#00C800')} !important;
+                    background-color: {bar_color} !important;
                 }}
                 </style>
                 """,
@@ -744,41 +737,41 @@ with tab2:
 
         fig = go.Figure()
         
-        # 1. End Balance (The main purple/accent line, now a lighter green/white)
+        # 1. End Balance (The main line - soft white/gray)
         fig.add_trace(go.Scatter(
             x=df_chart['Date'].astype(str),
             y=df_chart['End Bal.'],
             mode='lines+markers',
             name='End Balance',
-            line=dict(color='white', width=3, shape='spline'), # Use white for high contrast
-            marker=dict(size=8, color='#00C800', line=dict(color='#17191e', width=2)),
+            line=dict(color='#CBD5E1', width=3, shape='spline'), # Soft White/Gray
+            marker=dict(size=8, color='#1ADF6A', line=dict(color='#17191e', width=2)), # Muted Green marker
             fill='tozeroy',
-            fillcolor='rgba(0, 200, 0, 0.1)' # Subtle green fill
+            fillcolor='rgba(26, 223, 106, 0.05)' # Very subtle green fill
         ))
         
-        # 2. Start Balance (Dotted Line - maybe a light gray/yellow)
+        # 2. Start Balance (Dotted Line - light gray)
         fig.add_trace(go.Scatter(
             x=df_chart['Date'].astype(str),
             y=df_chart['Start Bal.'],
             mode='lines+markers',
             name='Start Balance',
-            line=dict(color='#AAAAAA', width=2, dash='dot'), 
-            marker=dict(size=6, color='#CCCCCC')
+            line=dict(color='#888888', width=2, dash='dot'), 
+            marker=dict(size=6, color='#AAAAAA')
         ))
 
-        # 3. Target End Balance (Dashed Line - vibrant green)
+        # 3. Target End Balance (Dashed Line - muted green)
         fig.add_trace(go.Scatter(
             x=df_chart['Date'].astype(str),
             y=df_chart['Start Bal.'] + df_chart['Target P&L'],
             mode='lines',
             name='Target End Bal',
-            line=dict(color='#00C800', width=2, dash='dash')
+            line=dict(color='#1ADF6A', width=2, dash='dash')
         ))
         
         # Determine y-axis range dynamically with padding
         if not df_chart.empty:
             min_bal = df_chart[['End Bal.', 'Start Bal.']].min().min()
-            max_bal = df_chart[['End Bal.', 'Start Bal.']].max().max()
+            max_bal = df_chart[['End Bal.', 'Start Bal.'].max().max()
             padding = (max_bal - min_bal) * 0.1 
             y_range = [max(0, min_bal - padding), max_bal + padding]
         else:
@@ -803,14 +796,14 @@ with tab2:
             ),
             xaxis=dict(
                 showgrid=True, 
-                gridcolor='rgba(0, 200, 0, 0.1)', # Subtle grid lines
+                gridcolor='rgba(26, 223, 106, 0.08)', # Very subtle grid lines
                 tickfont=dict(color='#E0E7FF'),
                 tickformat="%b %d<br>%Y",
                 dtick='d' # Fix: Ensure one tick per date
             ),
             yaxis=dict(
                 showgrid=True, 
-                gridcolor='rgba(0, 200, 0, 0.1)', # Subtle grid lines
+                gridcolor='rgba(26, 223, 106, 0.08)', # Very subtle grid lines
                 tickfont=dict(color='#E0E7FF'),
                 autorange=False, 
                 range=y_range 
@@ -873,8 +866,11 @@ with tab3:
                 
                 df_chart_pnl = df_summary_filtered.sort_values(by='Date', ascending=True)
                 
-                # Use Robinhood green/red
-                colors = ['#00C800' if x > 0 else '#FF5353' for x in df_chart_pnl['Actual P&L']]
+                # Use Subtler Green and Red
+                SUBTLE_GREEN = '#1ADF6A'
+                VIBRANT_RED = '#FF5353'
+
+                colors = [SUBTLE_GREEN if x > 0 else VIBRANT_RED for x in df_chart_pnl['Actual P&L']]
                 
                 fig_pnl = go.Figure()
                 
@@ -885,7 +881,7 @@ with tab3:
                     name='Daily P&L',
                     text=df_chart_pnl['Actual P&L'].apply(lambda x: f'${x:,.2f}'),
                     textposition='auto', 
-                    textfont=dict(color='#17191e', size=11), # Dark text on bright bars
+                    textfont=dict(color='#17191e', size=11), # Dark text on bright/muted bars
                     marker=dict(line=dict(color='rgba(0, 0, 0, 0.3)', width=1))
                 ))
                 
@@ -900,16 +896,16 @@ with tab3:
                     title_font=dict(size=18, color='#f8fafc', family="Inter"),
                     xaxis=dict(
                         showgrid=True, 
-                        gridcolor='rgba(0, 200, 0, 0.1)',
+                        gridcolor='rgba(26, 223, 106, 0.08)',
                         tickfont=dict(color='#E0E7FF'),
                         tickformat="%b %d<br>%Y" ,
                         dtick='d' # Fix: Ensure one tick per date
                     ),
                     yaxis=dict(
                         showgrid=True, 
-                        gridcolor='rgba(0, 200, 0, 0.1)', 
+                        gridcolor='rgba(26, 223, 106, 0.08)', 
                         zeroline=True, 
-                        zerolinecolor='rgba(0, 200, 0, 0.3)',
+                        zerolinecolor='rgba(26, 223, 106, 0.3)',
                         tickfont=dict(color='#E0E7FF')
                     ),
                     margin=dict(t=50)
@@ -933,10 +929,10 @@ with tab3:
                 result_counts = result_counts[['Result', 'Count']]
                 result_counts = result_counts[result_counts['Count'] > 0] 
                 
-                # Define colors for Pie chart
+                # Define colors for Pie chart (using softer green)
                 pie_colors = {
-                    'Win': '#00C800',
-                    'Loss': '#FF5353',
+                    'Win': SUBTLE_GREEN, # Muted Green
+                    'Loss': VIBRANT_RED,
                     'Breakeven': '#AAAAAA'
                 }
                 
