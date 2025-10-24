@@ -786,6 +786,16 @@ with tab2:
             line=dict(color='#10b981', width=2, dash='dash') # Green, Dashed
         ))
         
+        # Determine y-axis range dynamically with padding
+        if not df_chart.empty:
+            min_bal = df_chart[['End Bal.', 'Start Bal.', 'Target P&L']].min().min()
+            max_bal = df_chart[['End Bal.', 'Start Bal.', 'Target P&L']].max().max()
+            padding = (max_bal - min_bal) * 0.1 # Add 10% padding
+            y_range = [min_bal - padding, max_bal + padding]
+        else:
+            y_range = [0, 100] # Default if no data
+
+
         fig.update_layout(
             title='Balance Progression Over Time',
             xaxis_title="Date", 
@@ -796,17 +806,27 @@ with tab2:
             paper_bgcolor='rgba(0,0,0,0)',
             font=dict(family="Inter, sans-serif", size=12, color="#e0e7ff"),
             title_font=dict(size=20, color='#f8fafc', family="Inter"),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, bgcolor='rgba(0,0,0,0)'), # Added legend config
+            legend=dict(
+                orientation="h", 
+                yanchor="bottom", y=1.02, xanchor="right", x=1, 
+                bgcolor='rgba(0,0,0,0)',
+                font=dict(color="#e0e7ff")
+            ),
             xaxis=dict(
                 showgrid=True, 
                 gridcolor='rgba(99, 102, 241, 0.1)',
-                tickfont=dict(color='#cbd5e1')
+                tickfont=dict(color='#cbd5e1'),
+                # Set tickformat to only show date, not time
+                tickformat="%b %d<br>%Y" 
             ),
             yaxis=dict(
                 showgrid=True, 
                 gridcolor='rgba(99, 102, 241, 0.1)',
-                tickfont=dict(color='#cbd5e1')
-            )
+                tickfont=dict(color='#cbd5e1'),
+                autorange=False, # Disable default autorange
+                range=y_range # Use our custom padded range
+            ),
+            margin=dict(t=50) # Add top margin for the title
         )
         st.plotly_chart(fig, use_container_width=True)
 
@@ -819,17 +839,22 @@ with tab3:
     else:
         
         # === NEW: Date Filter ===
-        all_dates = df_summary['Date'].unique()
-        min_date = min(all_dates) if len(all_dates) > 0 else datetime.now().date()
-        max_date = max(all_dates) if len(all_dates) > 0 else datetime.now().date()
+        all_dates_summary = df_summary['Date'].unique()
+        all_dates_trades = df_trades['trade_date'].unique()
+        
+        # Combine and find overall min/max dates
+        all_available_dates = pd.to_datetime(list(all_dates_summary) + list(all_dates_trades)).unique()
+        
+        min_date_overall = min(all_available_dates) if len(all_available_dates) > 0 else datetime.now().date()
+        max_date_overall = max(all_available_dates) if len(all_available_dates) > 0 else datetime.now().date()
         
         col_start_date, col_end_date = st.columns(2)
         
         with col_start_date:
-            start_date = st.date_input("Start Date", value=min_date, min_value=min_date, max_value=max_date)
+            start_date = st.date_input("Start Date", value=min_date_overall, min_value=min_date_overall, max_value=max_date_overall)
         
         with col_end_date:
-            end_date = st.date_input("End Date", value=max_date, min_value=min_date, max_value=max_date)
+            end_date = st.date_input("End Date", value=max_date_overall, min_value=min_date_overall, max_value=max_date_overall)
 
         if start_date > end_date:
             st.error("❌ Error: Start Date must be before or the same as End Date.")
@@ -873,7 +898,7 @@ with tab3:
                     marker_color=colors,
                     name='Daily P&L',
                     text=df_chart_pnl['Actual P&L'].apply(lambda x: f'${x:,.2f}'),
-                    textposition='outside',
+                    textposition='auto', # Changed from 'outside' to 'auto' for better fit
                     textfont=dict(color='#f8fafc', size=11),
                     marker=dict(line=dict(color='rgba(99, 102, 241, 0.3)', width=1))
                 ))
@@ -890,7 +915,8 @@ with tab3:
                     xaxis=dict(
                         showgrid=True, 
                         gridcolor='rgba(99, 102, 241, 0.1)',
-                        tickfont=dict(color='#cbd5e1')
+                        tickfont=dict(color='#cbd5e1'),
+                        tickformat="%b %d<br>%Y" # Consistent date format
                     ),
                     yaxis=dict(
                         showgrid=True, 
@@ -898,7 +924,8 @@ with tab3:
                         zeroline=True, 
                         zerolinecolor='rgba(139, 92, 246, 0.3)',
                         tickfont=dict(color='#cbd5e1')
-                    )
+                    ),
+                    margin=dict(t=50) # Add top margin for the title
                 )
                 st.plotly_chart(fig_pnl, use_container_width=True)
                 
@@ -911,12 +938,19 @@ with tab3:
                 
                 result_counts = df_trades_temp['Result'].value_counts().reset_index()
                 result_counts.columns = ['Result', 'Count']
-                
+
+                # Ensure all categories (Win, Loss, Breakeven) are present for consistent coloring
+                all_results = pd.DataFrame({'Result': ['Win', 'Loss', 'Breakeven'], 'Count': [0, 0, 0]})
+                result_counts = pd.merge(all_results, result_counts, on='Result', how='left', suffixes=('_all', '')).fillna(0)
+                result_counts['Count'] = result_counts['Count_all'] + result_counts['Count'] # Sum counts
+                result_counts = result_counts[['Result', 'Count']]
+                result_counts = result_counts[result_counts['Count'] > 0] # Only show if count > 0
+
                 fig_pie = go.Figure(data=[go.Pie(
                     labels=result_counts['Result'],
                     values=result_counts['Count'],
                     hole=0.4,
-                    marker=dict(colors=['#34d399', '#f87171', '#818cf8']),
+                    marker=dict(colors=['#34d399', '#f87171', '#818cf8']), # Green, Red, Purple
                     textfont=dict(size=16, color='white', family='Inter'),
                     textinfo='label+percent'
                 )])
@@ -929,6 +963,7 @@ with tab3:
                     font=dict(family="Inter, sans-serif", size=12, color="#e0e7ff"),
                     title_font=dict(size=18, color='#f8fafc', family="Inter"),
                     showlegend=True,
-                    legend=dict(font=dict(color='#e0e7ff'))
+                    legend=dict(font=dict(color='#e0e7ff')),
+                    margin=dict(t=50) # Add top margin for the title
                 )
                 st.plotly_chart(fig_pie, use_container_width=True)
