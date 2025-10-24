@@ -18,7 +18,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- Custom CSS for Subtle Dark Green Styling (Revised) ---
+# --- Custom CSS for Subtle Dark Green Styling (FINAL REVISION) ---
 st.markdown("""
     <style>
     /* Import Google Fonts */
@@ -30,7 +30,8 @@ st.markdown("""
     /* **VIBRANT GREEN (For P&L)**: #00C800 */
     /* **SUBTLE GREEN (For Accents/Titles)**: #70E0A7 */
     /* Accent Red: #FF5353 (Vibrant Red) */
-    /* Text Light: #E0E7FF */
+    /* Text Light: #F0F4FF (Very light text for readability) */
+    /* Text General: #E0E7FF */
 
     /* Main background and theme */
     .main {
@@ -66,7 +67,7 @@ st.markdown("""
     }
     
     h2, h3 {
-        color: #E0E7FF; /* Light text for readability */
+        color: #E0E7FF;
         font-weight: 700;
         /* SUBTLE GREEN UNDERLINE/ACCENT */
         border-bottom: 2px solid rgba(112, 224, 167, 0.3); 
@@ -80,14 +81,15 @@ st.markdown("""
         border-right: 1px solid rgba(112, 224, 167, 0.2);
     }
     
+    /* Sidebar General Text Readability */
     [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
         color: #F0F4FF; /* Brighter text for better sidebar readability */
     }
 
     [data-testid="stSidebar"] h3 {
-        color: #f8fafc !important; /* Brighter sidebar header */
+        color: #f8fafc !important; 
         text-shadow: 0 0 5px rgba(112, 224, 167, 0.5);
-        border-bottom: none; /* Remove underline from sidebar header */
+        border-bottom: none; 
     }
     
     /* Metric cards styling */
@@ -97,12 +99,12 @@ st.markdown("""
         color: #f8fafc;
     }
     
-    /* Positive delta (Profit) - KEEP VIBRANT GREEN */
+    /* Positive delta (Profit) */
     [data-testid="stMetricDelta"] {
         color: #00C800; 
     }
     
-    /* Negative delta (Loss) - KEEP VIBRANT RED */
+    /* Negative delta (Loss) */
     [data-testid="stMetricDelta"][data-baseweb="badge"]::before {
         content: "▼";
         color: #FF5353 !important; 
@@ -111,21 +113,13 @@ st.markdown("""
         color: #FF5353 !important;
     }
     
+    /* Input Labels - FIX: Make all input labels bright for visibility */
+    .stTextInput label, .stNumberInput label, .stSelectbox label, .stDateInput label {
+        color: #F0F4FF !important; /* Very bright for max contrast */
+        font-weight: 600;
+    }
+
     /* Tabs styling */
-    .stTabs [data-baseweb="tab-list"] {
-        background-color: #212328; 
-        border-radius: 8px;
-        padding: 0.3rem;
-        border: 1px solid rgba(112, 224, 167, 0.1);
-    }
-    
-    .stTabs [data-baseweb="tab"] {
-        background-color: #292c31; 
-        color: #E0E7FF;
-        border-radius: 6px;
-        transition: all 0.2s ease;
-    }
-    
     .stTabs [aria-selected="true"] {
         /* USE SUBTLE GREEN FOR ACTIVE TAB ACCENT */
         background: #70E0A7 !important; 
@@ -134,28 +128,19 @@ st.markdown("""
         box-shadow: 0 2px 10px rgba(112, 224, 167, 0.3);
     }
     
-    /* Form styling */
-    .stForm {
-        background: #212328;
-        border-radius: 10px;
-        padding: 1.5rem;
-        border: 1px solid rgba(112, 224, 167, 0.15);
+    /* Info box - FIX: Change the color of the INFO box to a green tone for readability */
+    .stInfo {
+        background: rgba(112, 224, 167, 0.15); /* Light green background */
+        border-left: 4px solid #70E0A7; /* Subtle green border */
+        color: #F0F4FF; /* Very light text for contrast */
+        padding: 1rem;
+        border-radius: 4px;
     }
     
-    /* Input fields */
-    .stTextInput input, .stNumberInput input, .stSelectbox div, .stDateInput input {
-        background-color: #292c31 !important;
-        color: #E0E7FF !important;
-        border: 1px solid rgba(112, 224, 167, 0.3) !important;
-        border-radius: 6px;
+    .stInfo a {
+        color: #A8FFC7 !important; /* Brighter link in info box */
     }
-    
-    .stTextInput input:focus, .stNumberInput input:focus, .stSelectbox div:focus, .stDateInput input:focus {
-        /* USE SUBTLE GREEN FOR FOCUS BORDER */
-        border-color: #70E0A7 !important;
-        box-shadow: 0 0 0 3px rgba(112, 224, 167, 0.2) !important;
-    }
-    
+
     /* Button styling */
     .stButton button[kind="primary"] {
         background-color: #00C800; /* KEEP VIBRANT GREEN for core action */
@@ -176,18 +161,6 @@ st.markdown("""
         border-left: 4px solid #FF5353;
     }
     
-    /* Info box */
-    .stInfo {
-        background: rgba(112, 224, 167, 0.1);
-        border-left: 4px solid #70E0A7; /* Use subtle green for info box border */
-        color: #E0E7FF;
-    }
-    
-    /* Divider */
-    hr {
-        background: rgba(112, 224, 167, 0.1);
-    }
-
     /* Progress bar fill colors (Uses VIBRANT P&L colors) */
     .stProgress > div > div > div:first-child {
         background-color: #292c31 !important; 
@@ -628,8 +601,8 @@ with tab1:
             st.info(f"Today's P&L: **${today_actual_pl:,.2f}** (Target P&L is $0.00 or balance is negative).")
 
     else:
-        st.warning(f"Could not retrieve summary data for {today_date_obj.strftime('%Y-%m-%d')}. Please refresh or ensure a trade/deposit has been entered.")
-
+        st.info("No summary data for today yet. Your first trade will establish today's entry and target.")
+        
     st.markdown("---") 
     
     st.header("Log a New Trade")
