@@ -882,109 +882,109 @@ with tab2:
 
     ###
         # --- Today's Trade Breakdown Section ---
-    st.subheader("🗓️ Today's Trade Breakdown (CST/CDT)")
+        st.subheader("🗓️ Today's Trade Breakdown (CST/CDT)")
 
-    # Get today's date in Central Time
-    today_date_obj = datetime.now(CENTRAL_TZ).date()
+        # Get today's date in Central Time
+        today_date_obj = datetime.now(CENTRAL_TZ).date()
 
-    # Filter trades for today
-    df_trades_today = df_trades[df_trades['trade_date'] == today_date_obj].sort_index()
+        # Filter trades for today
+        df_trades_today = df_trades[df_trades['trade_date'] == today_date_obj].sort_index()
 
-    # If no trades found for today
-    if df_trades_today.empty:
-        st.info(f"ℹ️ No trades logged for today, {today_date_obj.strftime('%Y-%m-%d')}.")
-    else:
-        # Add a trade number column for order
-        df_trades_today['Trade #'] = range(1, len(df_trades_today) + 1)
+        # If no trades found for today
+        if df_trades_today.empty:
+            st.info(f"ℹ️ No trades logged for today, {today_date_obj.strftime('%Y-%m-%d')}.")
+        else:
+            # Add a trade number column for order
+            df_trades_today['Trade #'] = range(1, len(df_trades_today) + 1)
 
-        # Color green for positive P&L, red for negative
-        colors_today = ['#00ff88' if x > 0 else '#ff4757' for x in df_trades_today['pnl']]
+            # Color green for positive P&L, red for negative
+            colors_today = ['#00ff88' if x > 0 else '#ff4757' for x in df_trades_today['pnl']]
 
-        # Create the figure
-        fig_daily = go.Figure()
+            # Create the figure
+            fig_daily = go.Figure()
 
-        # --- Bar trace for individual trade P&L ---
-        fig_daily.add_trace(go.Bar(
-            x=df_trades_today['Trade #'],
-            y=df_trades_today['pnl'],
-            marker_color=colors_today,
-            name='Trade P&L',
-            hovertemplate=(
-                "<b>Trade #%{x}</b><br>" +
-                "P&L: $%{y:,.2f}<br>" +
-                "Ticker: %{customdata[0]}<br>" +
-                "Direction: %{customdata[1]}<br>" +
-                "Investment: $%{customdata[2]:,.2f}<extra></extra>"
-            ),
-            customdata=df_trades_today[['ticker', 'direction', 'investment']]
-        ))
+            # --- Bar trace for individual trade P&L ---
+            fig_daily.add_trace(go.Bar(
+                x=df_trades_today['Trade #'],
+                y=df_trades_today['pnl'],
+                marker_color=colors_today,
+                name='Trade P&L',
+                hovertemplate=(
+                    "<b>Trade #%{x}</b><br>" +
+                    "P&L: $%{y:,.2f}<br>" +
+                    "Ticker: %{customdata[0]}<br>" +
+                    "Direction: %{customdata[1]}<br>" +
+                    "Investment: $%{customdata[2]:,.2f}<extra></extra>"
+                ),
+                customdata=df_trades_today[['ticker', 'direction', 'investment']]
+            ))
 
-        # --- Running cumulative P&L line ---
-        df_trades_today['Running P&L'] = df_trades_today['pnl'].cumsum()
+            # --- Running cumulative P&L line ---
+            df_trades_today['Running P&L'] = df_trades_today['pnl'].cumsum()
 
-        fig_daily.add_trace(go.Scatter(
-            x=df_trades_today['Trade #'],
-            y=df_trades_today['Running P&L'],
-            mode='lines+markers',
-            name='Running P&L',
-            yaxis='y2',
-            line=dict(color='#fbbf24', width=2),
-            marker=dict(size=6, color='#fbbf24')
-        ))
+            fig_daily.add_trace(go.Scatter(
+                x=df_trades_today['Trade #'],
+                y=df_trades_today['Running P&L'],
+                mode='lines+markers',
+                name='Running P&L',
+                yaxis='y2',
+                line=dict(color='#fbbf24', width=2),
+                marker=dict(size=6, color='#fbbf24')
+            ))
 
-        # --- Calculate y-axis bounds safely ---
-        max_pnl = df_trades_today['pnl'].abs().max()
-        max_running = df_trades_today['Running P&L'].abs().max()
-        y_max = max(max_pnl, max_running) * 1.1
+            # --- Calculate y-axis bounds safely ---
+            max_pnl = df_trades_today['pnl'].abs().max()
+            max_running = df_trades_today['Running P&L'].abs().max()
+            y_max = max(max_pnl, max_running) * 1.1
 
-        # Ensure valid numeric range even if zero
-        if pd.isna(y_max) or y_max <= 0:
-            y_max = 1.0
+            # Ensure valid numeric range even if zero
+            if pd.isna(y_max) or y_max <= 0:
+                y_max = 1.0
 
-        # --- Update layout ---
-        fig_daily.update_layout(
-            title=f"Today's Individual Trade P&L ({today_date_obj.strftime('%Y-%m-%d')})",
-            xaxis_title="Trade Number",
-            yaxis=dict(
-                title="Individual P&L ($)",
-                titlefont=dict(color='#00ff88'),
-                tickfont=dict(color='#e8f5e9'),
-                showgrid=True,
-                gridcolor='rgba(0, 255, 136, 0.1)',
-                zeroline=True,
-                zerolinecolor='rgba(0, 255, 136, 0.3)',
-                range=[-y_max, y_max]
-            ),
-            yaxis2=dict(
-                title="Running P&L ($)",
-                titlefont=dict(color='#fbbf24'),
-                tickfont=dict(color='#e8f5e9'),
-                overlaying='y',
-                side='right',
-                showgrid=False,
-                zeroline=True,
-                zerolinecolor='rgba(0, 255, 136, 0.3)',
-                range=[-y_max, y_max]
-            ),
-            plot_bgcolor='#0f1419',
-            paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(family="Inter, sans-serif", size=12, color="#e8f5e9"),
-            title_font=dict(size=18, color='#00ff88'),
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=1.02,
-                xanchor="right",
-                x=1,
-                bgcolor='rgba(0,0,0,0)',
-                font=dict(color="#e8f5e9")
-            ),
-            margin=dict(t=50, b=50, l=50, r=50),
-            height=400,
-        )
+            # --- Update layout ---
+            fig_daily.update_layout(
+                title=f"Today's Individual Trade P&L ({today_date_obj.strftime('%Y-%m-%d')})",
+                xaxis_title="Trade Number",
+                yaxis=dict(
+                    title="Individual P&L ($)",
+                    titlefont=dict(color='#00ff88'),
+                    tickfont=dict(color='#e8f5e9'),
+                    showgrid=True,
+                    gridcolor='rgba(0, 255, 136, 0.1)',
+                    zeroline=True,
+                    zerolinecolor='rgba(0, 255, 136, 0.3)',
+                    range=[-y_max, y_max]
+                ),
+                yaxis2=dict(
+                    title="Running P&L ($)",
+                    titlefont=dict(color='#fbbf24'),
+                    tickfont=dict(color='#e8f5e9'),
+                    overlaying='y',
+                    side='right',
+                    showgrid=False,
+                    zeroline=True,
+                    zerolinecolor='rgba(0, 255, 136, 0.3)',
+                    range=[-y_max, y_max]
+                ),
+                plot_bgcolor='#0f1419',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(family="Inter, sans-serif", size=12, color="#e8f5e9"),
+                title_font=dict(size=18, color='#00ff88'),
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="right",
+                    x=1,
+                    bgcolor='rgba(0,0,0,0)',
+                    font=dict(color="#e8f5e9")
+                ),
+                margin=dict(t=50, b=50, l=50, r=50),
+                height=400,
+            )
 
-        # --- Display chart ---
-        st.plotly_chart(fig_daily, use_container_width=True)
+            # --- Display chart ---
+            st.plotly_chart(fig_daily, use_container_width=True)
 
 ###
 # --- Tab 3: Performance Analytics ---
