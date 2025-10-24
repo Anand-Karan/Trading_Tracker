@@ -4,6 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import gspread
+import numpy as np # Import numpy for potential date operations if needed
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -88,7 +89,16 @@ st.markdown("""
     }
     
     [data-testid="stMetricDelta"] {
-        color: #34d399;
+        /* This color is used for positive metrics */
+        color: #34d399; 
+    }
+    
+    /* Ensure negative delta is red */
+    [data-testid="stMetricDelta"] svg {
+        fill: #34d399;
+    }
+    [data-testid="stMetricDelta"] > div {
+        color: inherit;
     }
     
     /* Tabs styling */
@@ -262,9 +272,17 @@ st.markdown("""
         font-weight: 600;
         color: #f8fafc; /* White text on progress bar */
     }
+    
+    /* Custom style for the progress bar background (to make it look like a bar chart) */
+    .stProgress > div > div > div:first-child {
+        background-color: #312e81 !important; /* Dark background for the progress bar track */
+    }
 
-    /* Custom color for progress bar based on performance (requires more advanced CSS/JS, 
-       but for simplicity, we stick to Streamlit's default and use text to communicate status) */
+    /* Custom color logic for the progress fill - for demonstration purposes */
+    .stProgress > div > div > div > div {
+        /* Default to success color */
+        background-color: #10b981 !important;
+    }
 
     </style>
 """, unsafe_allow_html=True)
@@ -284,6 +302,7 @@ def connect_gsheets():
     """Authenticates and returns a gspread client object."""
     if not SHEET_ID: return None
     try:
+        # Use gspread.service_account_from_dict for authentication
         client = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
         return client
     except Exception as e:
@@ -352,11 +371,12 @@ def recalculate_all_summaries(initial_balance=2283.22):
 
     df_trades = get_data_from_sheet('trades')
     
+    # --- 1. Initial State if No Trades ---
     if df_trades.empty or df_trades.shape[0] == 0:
-        start_date = datetime.now().strftime("%Y-%m-%d")
+        start_date = datetime.now().date()
         summary_data = {
-            'Date': [start_date],
-            'Week': ['Wk 1'],
+            'Date': [start_date.strftime("%Y-%m-%d")],
+            'Week': [f'Wk {start_date.isocalendar()[1]}'],
             'Trades': [0],
             'Start Bal.': [initial_balance],
             'Target P&L': [initial_balance * 0.065],
@@ -368,6 +388,7 @@ def recalculate_all_summaries(initial_balance=2283.22):
         write_data_to_sheet('daily_summary', df_summary, mode='replace')
         return df_summary
 
+    # --- 2. Processing Trades & Recalculating History ---
     try:
         df_trades['trade_date'] = pd.to_datetime(df_trades['trade_date'], errors='coerce').dt.date.fillna(pd.NaT).ffill()
         df_trades['pnl'] = pd.to_numeric(df_trades['pnl'], errors='coerce').fillna(0)
@@ -410,7 +431,7 @@ def recalculate_all_summaries(initial_balance=2283.22):
 
     df_summary = pd.DataFrame(daily_summary_list)
     
-    # Re-integrate deposits/bonuses from the old summary
+    # --- 3. Re-integrate deposits/bonuses and Recalculate Balances ---
     df_old_summary = get_data_from_sheet('daily_summary')
     if not df_old_summary.empty:
         df_old_summary['Date'] = pd.to_datetime(df_old_summary['Date'], errors='coerce').dt.date.astype(str)
@@ -427,12 +448,9 @@ def recalculate_all_summaries(initial_balance=2283.22):
         new_summary_list = []
         for index, row in df_summary.iterrows():
             deposit = row['Deposit/Bonus']
-            
-            # Use the calculated P&L from trades for the day
             actual_pl = row['Actual P&L'] 
-            
             start_balance = current_balance_recalc
-            end_balance = start_balance + actual_pl + deposit # Deposit/Bonus impacts the ending balance
+            end_balance = start_balance + actual_pl + deposit 
             target_pl = start_balance * 0.065
             if start_balance <= 0:
                  target_pl = 0
@@ -453,6 +471,30 @@ def recalculate_all_summaries(initial_balance=2283.22):
         
     else:
         df_summary['Date'] = df_summary['Date'].astype(str)
+
+    # --- 4. NEW LOGIC: Preemptively add today's entry if the last recorded day is older ---
+    today_date_str = datetime.now().date().strftime("%Y-%m-%d")
+    
+    if df_summary['Date'].iloc[-1] != today_date_str:
+        
+        # Get the latest known balance
+        last_end_bal = df_summary['End Bal.'].iloc[-1] if not df_summary.empty else initial_balance
+        
+        today_start_bal = last_end_bal
+        today_target_pl = today_start_bal * 0.065
+        
+        new_row = pd.DataFrame([{
+            'Date': today_date_str,
+            'Week': f'Wk {datetime.now().date().isocalendar()[1]}',
+            'Trades': 0,
+            'Start Bal.': round(today_start_bal, 2),
+            'Target P&L': round(today_target_pl, 2),
+            'Actual P&L': 0.0,
+            'Deposit/Bonus': 0.0,
+            'End Bal.': round(today_start_bal, 2),
+        }])
+        
+        df_summary = pd.concat([df_summary, new_row], ignore_index=True)
 
 
     if not df_summary.empty:
@@ -516,14 +558,13 @@ df_summary, df_trades = load_data()
 
 # Find the true starting balance from the first day's summary
 if not df_summary.empty and 'Start Bal.' in df_summary.columns:
-    # Use the Start Bal from the first recorded trading day as the initial balance for stats
     first_start_bal = df_summary['Start Bal.'].iloc[0] 
     st.session_state.initial_balance = first_start_bal
     
-# Initial recalculation if data is missing
-if df_summary.empty or (df_summary.shape[0] == 1 and df_trades.empty):
-    recalculate_all_summaries(st.session_state.initial_balance)
-    df_summary, df_trades = load_data()
+# Initial recalculation or immediate recalculation to ensure today's row exists
+recalculate_all_summaries(st.session_state.initial_balance)
+# Reload data after recalculation
+df_summary, df_trades = load_data()
 
 
 # --- Sidebar: Quick Stats ---
@@ -625,44 +666,86 @@ with tab1:
     # 1. Get Today's Date Object (since df_summary['Date'] is datetime.date)
     today_date_obj = datetime.now().date()
 
-    # 2. Find Today's Summary Row
+    # 2. Find Today's Summary Row (This is guaranteed to exist now due to the fix)
     df_today = df_summary[df_summary['Date'] == today_date_obj]
 
     if not df_today.empty:
         today_target_pl = df_today['Target P&L'].iloc[0]
         today_actual_pl = df_today['Actual P&L'].iloc[0]
         
-        # Only calculate the bar fill if there was a target
+        # --- PROGRESS BAR LOGIC (The implementation of your request) ---
+        
         if today_target_pl > 0:
-            # Calculate fill ratio: 
-            fill_ratio = today_actual_pl / today_target_pl 
             
-            # Determine label and color text
-            if today_actual_pl >= today_target_pl:
-                label_text = f"**Target HIT!** (P&L: ${today_actual_pl:,.2f})"
-                # st.progress doesn't allow custom color, but we use the text to communicate
-            elif today_actual_pl > 0:
-                label_text = f"**Making Progress:** {min(100, fill_ratio*100):.1f}% of Target (P&L: ${today_actual_pl:,.2f})"
-            else: # Loss or Breakeven
-                label_text = f"**Loss/Behind Target:** (P&L: ${today_actual_pl:,.2f})"
-                
             st.info(f"**Target P&L for Today:** `${today_target_pl:,.2f}`")
             
-            # Display Progress Bar. Streamlit progress bar value goes from 0 to 100.
-            # We cap it at 100 for visual consistency but use the label to show over-performance.
+            if today_actual_pl >= today_target_pl:
+                # Target HIT! (Bar is 100% full, label shows the actual high P&L)
+                fill_value = 100
+                label_text = f"**Target HIT!** (P&L: ${today_actual_pl:,.2f})"
+                
+                # Apply custom CSS class for success state (Green)
+                st.markdown(
+                    """
+                    <style>
+                    [data-testid="stProgress"] > div > div > div > div {
+                        background-color: #10b981 !important; /* Tailwind green-600 */
+                    }
+                    </style>
+                    """,
+                    unsafe_allow_html=True
+                )
+                
+            elif today_actual_pl > 0:
+                # Making Progress (Bar fills proportionally)
+                fill_ratio = today_actual_pl / today_target_pl 
+                fill_value = int(fill_ratio * 100)
+                label_text = f"**Making Progress:** {fill_value:.1f}% of Target (P&L: ${today_actual_pl:,.2f})"
+
+                # Apply custom CSS class for neutral progress (Blue/Purple)
+                st.markdown(
+                    """
+                    <style>
+                    [data-testid="stProgress"] > div > div > div > div {
+                        background-color: #818cf8 !important; /* Tailwind indigo-400 */
+                    }
+                    </style>
+                    """,
+                    unsafe_allow_html=True
+                )
+                
+            else: # Loss or Breakeven (Actual P&L <= 0)
+                # Loss (Bar remains at 0, label clearly shows the loss)
+                fill_value = 0
+                label_text = f"**LOSS/Behind Target:** (P&L: ${today_actual_pl:,.2f})"
+                
+                # Apply custom CSS class for loss state (Red)
+                st.markdown(
+                    """
+                    <style>
+                    [data-testid="stProgress"] > div > div > div > div {
+                        background-color: #dc2626 !important; /* Tailwind red-600 */
+                    }
+                    </style>
+                    """,
+                    unsafe_allow_html=True
+                )
+                
+            # Display Progress Bar. Capped at 100 for visual consistency.
             st.progress(
-                value=min(100, int(fill_ratio * 100)), 
+                value=min(100, fill_value), 
                 text=label_text 
             )
             
         else:
-            st.info(f"Today's P&L: **${today_actual_pl:,.2f}** (Target P&L calculation resulted in $0.00).")
+            # This handles cases where the starting balance is $0 or negative, making the target $0
+            st.info(f"Today's P&L: **${today_actual_pl:,.2f}** (Target P&L is $0.00 or balance is negative).")
 
     else:
-        st.info("No summary data for today yet. Your first trade will establish today's entry and target.")
+        # Fallback, though should be rare due to recalculation logic
+        st.warning("Could not retrieve today's summary. Please refresh or log a trade.")
 
     st.markdown("---") 
-    # === END NEW CODE ===
     
     st.header("Log a New Trade")
     
@@ -708,9 +791,7 @@ with tab1:
                 if write_data_to_sheet('trades', new_trade_data, mode='append'):
                     st.success("✅ Trade successfully logged!")
                     
-                    recalculate_all_summaries(st.session_state.initial_balance)
-                    
-                    # Rerun to refresh the data and the progress bar
+                    # Rerun to force full data reload and progress bar update
                     st.rerun()
                 else:
                     st.error("❌ Failed to log trade to Google Sheet.")
@@ -734,7 +815,6 @@ with tab2:
         currency_cols = ['Start Bal.', 'Target P&L', 'Actual P&L', 'Deposit/Bonus', 'End Bal.']
         for col in currency_cols:
              if col in df_display.columns:
-                # Use .fillna(0) before applying the lambda to ensure all values are numeric for clean formatting
                 df_display[col] = pd.to_numeric(df_display[col], errors='coerce').fillna(0).apply(lambda x: f"${x:,.2f}")
 
         cols_to_keep = ['Date', 'Week', 'Trades', 'Start Bal.', 'Target P&L', 'Actual P&L', 'Deposit/Bonus', 'End Bal.']
@@ -751,8 +831,6 @@ with tab2:
         df_chart = df_summary.sort_values(by='Date', ascending=True)
 
         fig = go.Figure()
-        
-        # === ENHANCED PLOT TRACES ===
         
         # 1. End Balance (Solid Line & Area)
         fig.add_trace(go.Scatter(
@@ -772,28 +850,27 @@ with tab2:
             y=df_chart['Start Bal.'],
             mode='lines+markers',
             name='Start Balance',
-            line=dict(color='#facc15', width=2, dash='dot'), # Yellow, Dotted
+            line=dict(color='#facc15', width=2, dash='dot'), 
             marker=dict(size=6, color='#fcd34d')
         ))
 
         # 3. Target End Balance (Dashed Line)
-        # Calculates the Balance if the daily target was hit
         fig.add_trace(go.Scatter(
             x=df_chart['Date'].astype(str),
             y=df_chart['Start Bal.'] + df_chart['Target P&L'],
             mode='lines',
             name='Target End Bal',
-            line=dict(color='#10b981', width=2, dash='dash') # Green, Dashed
+            line=dict(color='#10b981', width=2, dash='dash')
         ))
         
-        # Determine y-axis range dynamically with padding
+        # Determine y-axis range dynamically with padding (Autoscale in the middle)
         if not df_chart.empty:
-            min_bal = df_chart[['End Bal.', 'Start Bal.', 'Target P&L']].min().min()
-            max_bal = df_chart[['End Bal.', 'Start Bal.', 'Target P&L']].max().max()
+            min_bal = df_chart[['End Bal.', 'Start Bal.']].min().min()
+            max_bal = df_chart[['End Bal.', 'Start Bal.']].max().max()
             padding = (max_bal - min_bal) * 0.1 # Add 10% padding
-            y_range = [min_bal - padding, max_bal + padding]
+            y_range = [max(0, min_bal - padding), max_bal + padding]
         else:
-            y_range = [0, 100] # Default if no data
+            y_range = [0, 100]
 
 
         fig.update_layout(
@@ -816,17 +893,16 @@ with tab2:
                 showgrid=True, 
                 gridcolor='rgba(99, 102, 241, 0.1)',
                 tickfont=dict(color='#cbd5e1'),
-                # Set tickformat to only show date, not time
                 tickformat="%b %d<br>%Y" 
             ),
             yaxis=dict(
                 showgrid=True, 
                 gridcolor='rgba(99, 102, 241, 0.1)',
                 tickfont=dict(color='#cbd5e1'),
-                autorange=False, # Disable default autorange
-                range=y_range # Use our custom padded range
+                autorange=False, 
+                range=y_range 
             ),
-            margin=dict(t=50) # Add top margin for the title
+            margin=dict(t=50) 
         )
         st.plotly_chart(fig, use_container_width=True)
 
@@ -838,11 +914,10 @@ with tab3:
         st.info("ℹ️ No trade data yet. Start logging trades to see analytics!")
     else:
         
-        # === NEW: Date Filter ===
+        # === Date Filter ===
         all_dates_summary = df_summary['Date'].unique()
         all_dates_trades = df_trades['trade_date'].unique()
         
-        # Combine and find overall min/max dates
         all_available_dates = pd.to_datetime(list(all_dates_summary) + list(all_dates_trades)).unique()
         
         min_date_overall = min(all_available_dates) if len(all_available_dates) > 0 else datetime.now().date()
@@ -858,17 +933,14 @@ with tab3:
 
         if start_date > end_date:
             st.error("❌ Error: Start Date must be before or the same as End Date.")
-            # Set filter dataframes to empty to prevent errors
             df_summary_filtered = pd.DataFrame()
             df_trades_filtered = pd.DataFrame()
         else:
-            # Filter the summary data
             df_summary_filtered = df_summary[
                 (df_summary['Date'] >= start_date) & 
                 (df_summary['Date'] <= end_date)
             ]
             
-            # Filter the trades data
             df_trades_filtered = df_trades[
                 (df_trades['trade_date'] >= start_date) & 
                 (df_trades['trade_date'] <= end_date)
@@ -898,7 +970,7 @@ with tab3:
                     marker_color=colors,
                     name='Daily P&L',
                     text=df_chart_pnl['Actual P&L'].apply(lambda x: f'${x:,.2f}'),
-                    textposition='auto', # Changed from 'outside' to 'auto' for better fit
+                    textposition='auto', 
                     textfont=dict(color='#f8fafc', size=11),
                     marker=dict(line=dict(color='rgba(99, 102, 241, 0.3)', width=1))
                 ))
@@ -916,7 +988,7 @@ with tab3:
                         showgrid=True, 
                         gridcolor='rgba(99, 102, 241, 0.1)',
                         tickfont=dict(color='#cbd5e1'),
-                        tickformat="%b %d<br>%Y" # Consistent date format
+                        tickformat="%b %d<br>%Y" 
                     ),
                     yaxis=dict(
                         showgrid=True, 
@@ -925,7 +997,7 @@ with tab3:
                         zerolinecolor='rgba(139, 92, 246, 0.3)',
                         tickfont=dict(color='#cbd5e1')
                     ),
-                    margin=dict(t=50) # Add top margin for the title
+                    margin=dict(t=50)
                 )
                 st.plotly_chart(fig_pnl, use_container_width=True)
                 
@@ -942,15 +1014,15 @@ with tab3:
                 # Ensure all categories (Win, Loss, Breakeven) are present for consistent coloring
                 all_results = pd.DataFrame({'Result': ['Win', 'Loss', 'Breakeven'], 'Count': [0, 0, 0]})
                 result_counts = pd.merge(all_results, result_counts, on='Result', how='left', suffixes=('_all', '')).fillna(0)
-                result_counts['Count'] = result_counts['Count_all'] + result_counts['Count'] # Sum counts
+                result_counts['Count'] = result_counts['Count_all'] + result_counts['Count'] 
                 result_counts = result_counts[['Result', 'Count']]
-                result_counts = result_counts[result_counts['Count'] > 0] # Only show if count > 0
+                result_counts = result_counts[result_counts['Count'] > 0] 
 
                 fig_pie = go.Figure(data=[go.Pie(
                     labels=result_counts['Result'],
                     values=result_counts['Count'],
                     hole=0.4,
-                    marker=dict(colors=['#34d399', '#f87171', '#818cf8']), # Green, Red, Purple
+                    marker=dict(colors=['#34d399', '#f87171', '#818cf8']), 
                     textfont=dict(size=16, color='white', family='Inter'),
                     textinfo='label+percent'
                 )])
@@ -964,6 +1036,6 @@ with tab3:
                     title_font=dict(size=18, color='#f8fafc', family="Inter"),
                     showlegend=True,
                     legend=dict(font=dict(color='#e0e7ff')),
-                    margin=dict(t=50) # Add top margin for the title
+                    margin=dict(t=50)
                 )
                 st.plotly_chart(fig_pie, use_container_width=True)
