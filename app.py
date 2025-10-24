@@ -949,8 +949,7 @@ with tab2:
                 xaxis_title="Trade #",
                 hovermode='x unified',
                 yaxis=dict(
-                    title="Individual P&L ($)",
-                    titlefont=dict(color='#00ff88'),
+                    title=dict(text="Individual P&L ($)", font=dict(color='#00ff88')),
                     tickfont=dict(color='#e8f5e9'),
                     showgrid=True,
                     gridcolor='rgba(0, 255, 136, 0.1)',
@@ -959,8 +958,7 @@ with tab2:
                     range=[-y_max, y_max]
                 ),
                 yaxis2=dict(
-                    title="Running P&L ($)",
-                    titlefont=dict(color='#fbbf24'),
+                    title=dict(text="Running P&L ($)", font=dict(color='#fbbf24')),
                     tickfont=dict(color='#e8f5e9'),
                     overlaying='y',
                     side='right',
@@ -992,7 +990,8 @@ with tab2:
             )
 
             # --- Display chart ---
-            st.plotly_chart(fig_daily, use_container_width=True)
+            st.plotly_chart(fig_daily, width="stretch")
+
 
 
 ###
