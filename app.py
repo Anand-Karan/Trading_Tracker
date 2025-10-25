@@ -24,24 +24,9 @@ def check_password():
     
     def password_entered():
         """Checks whether a password entered by the user is correct."""
-        # Get password from secrets - try multiple approaches
-        raw_password = st.secrets.get("app_password", "trading123")
-        
-        # Try to clean it in multiple ways
-        correct_password = str(raw_password).strip()
-        
-        # Remove quotes if present
-        if correct_password.startswith('"') and correct_password.endswith('"'):
-            correct_password = correct_password[1:-1]
-        if correct_password.startswith("'") and correct_password.endswith("'"):
-            correct_password = correct_password[1:-1]
-            
+        # Get password from secrets, handle both quoted and unquoted formats
+        correct_password = str(st.secrets.get("app_password", "trading123")).strip().strip('"').strip("'")
         entered_password = st.session_state["password"].strip()
-        
-        # DEBUG - uncomment these lines temporarily to see what's being compared
-        st.write(f"Raw from secrets: `{repr(raw_password)}`")
-        st.write(f"After cleaning: `{repr(correct_password)}`")
-        st.write(f"You entered: `{repr(entered_password)}`")
         
         if entered_password == correct_password:
             st.session_state["password_correct"] = True
