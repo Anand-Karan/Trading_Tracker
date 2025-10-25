@@ -851,6 +851,59 @@ with tab1:
                 else:
                     st.error("❌ Failed to log trade to Google Sheet.")
 
+# --- Deposit / Bonus Entry ---
+with st.expander("💵 Add Deposit or Bonus", expanded=False):
+    st.info("Use this to add any deposit or bonus amount to a specific day. This will update your balance and daily summaries automatically.")
+
+    with st.form("deposit_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            deposit_date = st.date_input("Select Date", datetime.now(CENTRAL_TZ).date())
+        with col2:
+            deposit_amount = st.number_input("Deposit / Bonus Amount ($)", min_value=0.0, value=0.0, step=50.0, format="%.2f")
+
+        submit_deposit = st.form_submit_button("✅ Add Deposit / Bonus", use_container_width=True)
+
+        if submit_deposit:
+            df_summary_latest = get_data_from_sheet("daily_summary")
+
+            if df_summary_latest.empty:
+                st.error("⚠️ No summary found. Please record at least one trade before adding deposits.")
+            else:
+                # Convert date formats for comparison
+                df_summary_latest["Date"] = pd.to_datetime(df_summary_latest["Date"], errors="coerce").dt.date
+
+                if deposit_date in df_summary_latest["Date"].values:
+                    # Update existing deposit value for the day
+                    idx = df_summary_latest[df_summary_latest["Date"] == deposit_date].index[0]
+                    prev_value = df_summary_latest.at[idx, "Deposit/Bonus"]
+                    df_summary_latest.at[idx, "Deposit/Bonus"] = float(prev_value) + deposit_amount
+                    st.success(f"💰 Added ${deposit_amount:,.2f} to {deposit_date}.")
+                else:
+                    # If date missing (e.g., future day) — add new row
+                    new_row = {
+                        "Date": deposit_date.strftime("%Y-%m-%d"),
+                        "Week": f"Wk {deposit_date.isocalendar()[1]}",
+                        "Trades": 0,
+                        "Start Bal.": 0.0,
+                        "Target P&L": 0.0,
+                        "Actual P&L": 0.0,
+                        "Deposit/Bonus": deposit_amount,
+                        "End Bal.": 0.0,
+                    }
+                    df_summary_latest = pd.concat([df_summary_latest, pd.DataFrame([new_row])], ignore_index=True)
+                    st.info(f"🆕 Created new entry for {deposit_date} with ${deposit_amount:,.2f} deposit.")
+
+                # Write back to sheet
+                success = write_data_to_sheet("daily_summary", df_summary_latest, mode="replace")
+                if success:
+                    recalculate_all_summaries(st.session_state.initial_balance)
+                    st.success("✅ Deposit recorded and balances updated!")
+                    st.balloons()
+                    st.rerun()
+                else:
+                    st.error("❌ Failed to update deposit in Google Sheet.")
+
 
 # --- Tab 2: Daily Summary ---
 with tab2:
