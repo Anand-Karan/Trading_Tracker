@@ -1142,14 +1142,58 @@ with tab3:
         min_date_overall = min(all_available_dates) if len(all_available_dates) > 0 else datetime.now(CENTRAL_TZ).date()
         max_date_overall = max(all_available_dates) if len(all_available_dates) > 0 else datetime.now(CENTRAL_TZ).date()
         
-        col_start_date, col_end_date = st.columns(2)
+        # col_start_date, col_end_date = st.columns(2)
         
-        with col_start_date:
+        # with col_start_date:
+        #     start_date = st.date_input("Start Date", value=min_date_overall, min_value=min_date_overall, max_value=max_date_overall)
+        
+        # with col_end_date:
+        #     end_date = st.date_input("End Date", value=max_date_overall, min_value=min_date_overall, max_value=max_date_overall)
+
+
+        # --- Date Range Filters ---
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
             start_date = st.date_input("Start Date", value=min_date_overall, min_value=min_date_overall, max_value=max_date_overall)
-        
-        with col_end_date:
+
+        with col2:
             end_date = st.date_input("End Date", value=max_date_overall, min_value=min_date_overall, max_value=max_date_overall)
 
+        with col3:
+            # Week filter (multi-select)
+            available_weeks = sorted(df_summary['Week'].unique())
+            selected_weeks = st.multiselect("Filter by Week #", available_weeks, default=available_weeks)
+
+        # --- Ticker Filter (Multi-select) ---
+        unique_tickers = sorted(df_trades['ticker'].dropna().unique()) if 'ticker' in df_trades.columns else []
+        selected_tickers = st.multiselect(
+            "Filter by Ticker(s)", 
+            options=unique_tickers, 
+            default=unique_tickers,
+            help="Select one or more tickers to focus your analysis."
+        )
+
+        # --- Apply Filters ---
+        if start_date > end_date:
+            st.error("❌ Error: Start Date must be before or the same as End Date.")
+            df_summary_filtered = pd.DataFrame()
+            df_trades_filtered = pd.DataFrame()
+        else:
+            df_summary_filtered = df_summary[
+                (df_summary['Date'] >= start_date) & 
+                (df_summary['Date'] <= end_date) & 
+                (df_summary['Week'].isin(selected_weeks))
+            ]
+
+            df_trades_filtered = df_trades[
+                (df_trades['trade_date'] >= start_date) & 
+                (df_trades['trade_date'] <= end_date)
+            ]
+            if len(selected_tickers) > 0:
+                df_trades_filtered = df_trades_filtered[df_trades_filtered['ticker'].isin(selected_tickers)]
+
+        #########
         if start_date > end_date:
             st.error("❌ Error: Start Date must be before or the same as End Date.")
             df_summary_filtered = pd.DataFrame()
