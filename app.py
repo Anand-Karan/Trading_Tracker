@@ -1210,36 +1210,92 @@ with tab3:
             ]
 
         st.markdown("---")
-        
-        if df_summary_filtered.empty or df_trades_filtered.empty:
-            st.info("ℹ️ No trading data found for the selected date range.")
-            
+
+
+        # --- Apply Filters with Ticker + Week Support ---
+        if start_date > end_date:
+            st.error("❌ Error: Start Date must be before or the same as End Date.")
+            df_summary_filtered = pd.DataFrame()
+            df_trades_filtered = pd.DataFrame()
         else:
+            # --- Filter daily summary by date + week ---
+            df_summary_filtered = df_summary[
+                (df_summary['Date'] >= start_date)
+                & (df_summary['Date'] <= end_date)
+                & (df_summary['Week'].isin(selected_weeks))
+            ]
+
+            # --- Filter trades by date + ticker ---
+            df_trades_filtered = df_trades[
+                (df_trades['trade_date'] >= start_date)
+                & (df_trades['trade_date'] <= end_date)
+            ]
+            if len(selected_tickers) > 0:
+                df_trades_filtered = df_trades_filtered[
+                    df_trades_filtered['ticker'].isin(selected_tickers)
+                ]
+
+            # ✅ If ticker filter applied, recompute daily P&L from filtered trades
+            if not df_trades_filtered.empty:
+                daily_trade_perf = (
+                    df_trades_filtered.groupby('trade_date', as_index=False)['pnl']
+                    .sum()
+                    .rename(columns={'trade_date': 'Date', 'pnl': 'Actual P&L'})
+                )
+
+                # Merge new daily P&L into summary
+                df_summary_filtered = pd.merge(
+                    df_summary_filtered,
+                    daily_trade_perf,
+                    on='Date',
+                    how='left',
+                    suffixes=('', '_from_trades')
+                )
+
+                # Replace Actual P&L with filtered ticker-based value
+                if 'Actual P&L_from_trades' in df_summary_filtered.columns:
+                    df_summary_filtered['Actual P&L'] = df_summary_filtered[
+                        'Actual P&L_from_trades'
+                    ].fillna(df_summary_filtered['Actual P&L'])
+                    df_summary_filtered.drop(columns=['Actual P&L_from_trades'], inplace=True)
+
+        # --- Summary Caption ---
+        st.caption(
+            f"📅 Showing data from **{start_date}** to **{end_date}** | "
+            f"🧾 Weeks: {', '.join(selected_weeks) if selected_weeks else 'All'} | "
+            f"🏷️ Tickers: {', '.join(selected_tickers) if selected_tickers else 'All'}"
+        )
+
+        # --- If no data, show info ---
+        if df_summary_filtered.empty or df_trades_filtered.empty:
+            st.info("ℹ️ No trading data found for the selected filters.")
+        else:
+            # --- Main Analytics Charts ---
             col_pnl, col_winrate = st.columns(2)
-            
+
             with col_pnl:
                 st.subheader("💵 Daily P&L Chart")
-                
+
                 df_chart_pnl = df_summary_filtered.sort_values(by='Date', ascending=True)
-                
                 colors = ['#00ff88' if x > 0 else '#ff4757' for x in df_chart_pnl['Actual P&L']]
-                
+
                 fig_pnl = go.Figure()
-                
-                fig_pnl.add_trace(go.Bar(
-                    x=df_chart_pnl['Date'].astype(str),
-                    y=df_chart_pnl['Actual P&L'],
-                    marker_color=colors,
-                    name='Daily P&L',
-                    text=df_chart_pnl['Actual P&L'].apply(lambda x: f'${x:,.2f}'),
-                    textposition='auto', 
-                    textfont=dict(color='#0a0e0f', size=11, weight='bold'), 
-                    marker=dict(line=dict(color='rgba(0, 0, 0, 0.3)', width=1))
-                ))
-                
+                fig_pnl.add_trace(
+                    go.Bar(
+                        x=df_chart_pnl['Date'].astype(str),
+                        y=df_chart_pnl['Actual P&L'],
+                        marker_color=colors,
+                        name='Daily P&L',
+                        text=df_chart_pnl['Actual P&L'].apply(lambda x: f'${x:,.2f}'),
+                        textposition='auto',
+                        textfont=dict(color='#0a0e0f', size=11, weight='bold'),
+                        marker=dict(line=dict(color='rgba(0, 0, 0, 0.3)', width=1)),
+                    )
+                )
+
                 fig_pnl.update_layout(
                     title=f'Daily Trading P&L ({start_date.strftime("%b %d")} - {end_date.strftime("%b %d")})',
-                    xaxis_title="Date", 
+                    xaxis_title="Date",
                     yaxis_title="P&L ($)",
                     height=450,
                     plot_bgcolor='#0f1419',
@@ -1247,55 +1303,60 @@ with tab3:
                     font=dict(family="Inter, sans-serif", size=12, color="#e8f5e9"),
                     title_font=dict(size=18, color='#00ff88', family="Inter"),
                     xaxis=dict(
-                        showgrid=True, 
+                        showgrid=True,
                         gridcolor='rgba(0, 255, 136, 0.1)',
                         tickfont=dict(color='#e8f5e9'),
-                        tickformat="%b %d<br>%Y" ,
-                        dtick='d' 
+                        tickformat="%b %d<br>%Y",
+                        dtick='d',
                     ),
                     yaxis=dict(
-                        showgrid=True, 
-                        gridcolor='rgba(0, 255, 136, 0.1)', 
-                        zeroline=True, 
+                        showgrid=True,
+                        gridcolor='rgba(0, 255, 136, 0.1)',
+                        zeroline=True,
                         zerolinecolor='rgba(0, 255, 136, 0.3)',
-                        tickfont=dict(color='#e8f5e9')
+                        tickfont=dict(color='#e8f5e9'),
                     ),
-                    margin=dict(t=50)
+                    margin=dict(t=50),
                 )
                 st.plotly_chart(fig_pnl, use_container_width=True)
-                
+
             with col_winrate:
                 st.subheader("🎯 Trade Win/Loss Breakdown")
-                
+
                 df_trades_temp = df_trades_filtered.copy()
-                df_trades_temp['Result'] = df_trades_temp['pnl'].apply(lambda x: 'Win' if x > 0 else ('Loss' if x < 0 else 'Breakeven'))
-                
+                df_trades_temp['Result'] = df_trades_temp['pnl'].apply(
+                    lambda x: 'Win' if x > 0 else ('Loss' if x < 0 else 'Breakeven')
+                )
+
                 result_counts = df_trades_temp['Result'].value_counts().reset_index()
                 result_counts.columns = ['Result', 'Count']
 
-                all_results = pd.DataFrame({'Result': ['Win', 'Loss', 'Breakeven'], 'Count': [0, 0, 0]})
-                result_counts = pd.merge(all_results, result_counts, on='Result', how='left', suffixes=('_all', '')).fillna(0)
-                result_counts['Count'] = result_counts['Count_all'] + result_counts['Count'] 
+                all_results = pd.DataFrame(
+                    {'Result': ['Win', 'Loss', 'Breakeven'], 'Count': [0, 0, 0]}
+                )
+                result_counts = pd.merge(
+                    all_results, result_counts, on='Result', how='left', suffixes=('_all', '')
+                ).fillna(0)
+                result_counts['Count'] = result_counts['Count_all'] + result_counts['Count']
                 result_counts = result_counts[['Result', 'Count']]
-                result_counts = result_counts[result_counts['Count'] > 0] 
-                
-                pie_colors = {
-                    'Win': '#00ff88',
-                    'Loss': '#ff4757',
-                    'Breakeven': '#94a3b8'
-                }
-                
+                result_counts = result_counts[result_counts['Count'] > 0]
+
+                pie_colors = {'Win': '#00ff88', 'Loss': '#ff4757', 'Breakeven': '#94a3b8'}
                 sorted_results = [pie_colors.get(r, '#94a3b8') for r in result_counts['Result']]
-                
-                fig_pie = go.Figure(data=[go.Pie(
-                    labels=result_counts['Result'],
-                    values=result_counts['Count'],
-                    hole=0.4,
-                    marker=dict(colors=sorted_results), 
-                    textfont=dict(size=16, color='#0a0e0f', family='Inter', weight='bold'),
-                    textinfo='label+percent'
-                )])
-                
+
+                fig_pie = go.Figure(
+                    data=[
+                        go.Pie(
+                            labels=result_counts['Result'],
+                            values=result_counts['Count'],
+                            hole=0.4,
+                            marker=dict(colors=sorted_results),
+                            textfont=dict(size=16, color='#0a0e0f', family='Inter', weight='bold'),
+                            textinfo='label+percent',
+                        )
+                    ]
+                )
+
                 fig_pie.update_layout(
                     title=f'Trade Outcomes ({df_trades_filtered.shape[0]} trades total)',
                     height=450,
@@ -1305,6 +1366,105 @@ with tab3:
                     title_font=dict(size=18, color='#00ff88', family="Inter"),
                     showlegend=True,
                     legend=dict(font=dict(color='#e8f5e9')),
-                    margin=dict(t=50)
+                    margin=dict(t=50),
                 )
                 st.plotly_chart(fig_pie, use_container_width=True)
+
+        
+        # if df_summary_filtered.empty or df_trades_filtered.empty:
+        #     st.info("ℹ️ No trading data found for the selected date range.")
+            
+        # else:
+        #     col_pnl, col_winrate = st.columns(2)
+            
+        #     with col_pnl:
+        #         st.subheader("💵 Daily P&L Chart")
+                
+        #         df_chart_pnl = df_summary_filtered.sort_values(by='Date', ascending=True)
+                
+        #         colors = ['#00ff88' if x > 0 else '#ff4757' for x in df_chart_pnl['Actual P&L']]
+                
+        #         fig_pnl = go.Figure()
+                
+        #         fig_pnl.add_trace(go.Bar(
+        #             x=df_chart_pnl['Date'].astype(str),
+        #             y=df_chart_pnl['Actual P&L'],
+        #             marker_color=colors,
+        #             name='Daily P&L',
+        #             text=df_chart_pnl['Actual P&L'].apply(lambda x: f'${x:,.2f}'),
+        #             textposition='auto', 
+        #             textfont=dict(color='#0a0e0f', size=11, weight='bold'), 
+        #             marker=dict(line=dict(color='rgba(0, 0, 0, 0.3)', width=1))
+        #         ))
+                
+        #         fig_pnl.update_layout(
+        #             title=f'Daily Trading P&L ({start_date.strftime("%b %d")} - {end_date.strftime("%b %d")})',
+        #             xaxis_title="Date", 
+        #             yaxis_title="P&L ($)",
+        #             height=450,
+        #             plot_bgcolor='#0f1419',
+        #             paper_bgcolor='rgba(0,0,0,0)',
+        #             font=dict(family="Inter, sans-serif", size=12, color="#e8f5e9"),
+        #             title_font=dict(size=18, color='#00ff88', family="Inter"),
+        #             xaxis=dict(
+        #                 showgrid=True, 
+        #                 gridcolor='rgba(0, 255, 136, 0.1)',
+        #                 tickfont=dict(color='#e8f5e9'),
+        #                 tickformat="%b %d<br>%Y" ,
+        #                 dtick='d' 
+        #             ),
+        #             yaxis=dict(
+        #                 showgrid=True, 
+        #                 gridcolor='rgba(0, 255, 136, 0.1)', 
+        #                 zeroline=True, 
+        #                 zerolinecolor='rgba(0, 255, 136, 0.3)',
+        #                 tickfont=dict(color='#e8f5e9')
+        #             ),
+        #             margin=dict(t=50)
+        #         )
+        #         st.plotly_chart(fig_pnl, use_container_width=True)
+                
+        #     with col_winrate:
+        #         st.subheader("🎯 Trade Win/Loss Breakdown")
+                
+        #         df_trades_temp = df_trades_filtered.copy()
+        #         df_trades_temp['Result'] = df_trades_temp['pnl'].apply(lambda x: 'Win' if x > 0 else ('Loss' if x < 0 else 'Breakeven'))
+                
+        #         result_counts = df_trades_temp['Result'].value_counts().reset_index()
+        #         result_counts.columns = ['Result', 'Count']
+
+        #         all_results = pd.DataFrame({'Result': ['Win', 'Loss', 'Breakeven'], 'Count': [0, 0, 0]})
+        #         result_counts = pd.merge(all_results, result_counts, on='Result', how='left', suffixes=('_all', '')).fillna(0)
+        #         result_counts['Count'] = result_counts['Count_all'] + result_counts['Count'] 
+        #         result_counts = result_counts[['Result', 'Count']]
+        #         result_counts = result_counts[result_counts['Count'] > 0] 
+                
+        #         pie_colors = {
+        #             'Win': '#00ff88',
+        #             'Loss': '#ff4757',
+        #             'Breakeven': '#94a3b8'
+        #         }
+                
+        #         sorted_results = [pie_colors.get(r, '#94a3b8') for r in result_counts['Result']]
+                
+        #         fig_pie = go.Figure(data=[go.Pie(
+        #             labels=result_counts['Result'],
+        #             values=result_counts['Count'],
+        #             hole=0.4,
+        #             marker=dict(colors=sorted_results), 
+        #             textfont=dict(size=16, color='#0a0e0f', family='Inter', weight='bold'),
+        #             textinfo='label+percent'
+        #         )])
+                
+        #         fig_pie.update_layout(
+        #             title=f'Trade Outcomes ({df_trades_filtered.shape[0]} trades total)',
+        #             height=450,
+        #             plot_bgcolor='rgba(0,0,0,0)',
+        #             paper_bgcolor='rgba(0,0,0,0)',
+        #             font=dict(family="Inter, sans-serif", size=12, color="#e8f5e9"),
+        #             title_font=dict(size=18, color='#00ff88', family="Inter"),
+        #             showlegend=True,
+        #             legend=dict(font=dict(color='#e8f5e9')),
+        #             margin=dict(t=50)
+        #         )
+        #         st.plotly_chart(fig_pie, use_container_width=True)
