@@ -24,7 +24,11 @@ def check_password():
     
     def password_entered():
         """Checks whether a password entered by the user is correct."""
-        if st.session_state["password"] == st.secrets.get("app_password", "trading123"):
+        # Get password from secrets, handle both quoted and unquoted formats
+        correct_password = str(st.secrets.get("app_password", "trading123")).strip().strip('"').strip("'")
+        entered_password = st.session_state["password"].strip()
+        
+        if entered_password == correct_password:
             st.session_state["password_correct"] = True
             del st.session_state["password"]  # Don't store password
         else:
@@ -51,7 +55,8 @@ def check_password():
                 type="password", 
                 on_change=password_entered, 
                 key="password",
-                label_visibility="collapsed"
+                label_visibility="collapsed",
+                placeholder="Enter password..."
             )
             st.markdown("<p style='text-align: center; color: #b8c5b8; font-size: 0.9rem;'>Contact admin for access</p>", unsafe_allow_html=True)
         return False
@@ -76,7 +81,8 @@ def check_password():
                 type="password", 
                 on_change=password_entered, 
                 key="password",
-                label_visibility="collapsed"
+                label_visibility="collapsed",
+                placeholder="Enter password..."
             )
             st.error("😕 Password incorrect")
             st.markdown("<p style='text-align: center; color: #b8c5b8; font-size: 0.9rem;'>Contact admin for access</p>", unsafe_allow_html=True)
@@ -87,7 +93,7 @@ def check_password():
 
 # Check password before showing the rest of the app
 if not check_password():
-    st.stop()  # Do not continue if password is not correct
+    st.stop()  # Do not continue if check fails
 
 # --- Custom CSS for Ultra Dark Green/Black Aesthetic ---
 st.markdown("""
