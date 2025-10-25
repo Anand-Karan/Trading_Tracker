@@ -18,6 +18,77 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# --- PASSWORD PROTECTION ---
+def check_password():
+    """Returns `True` if the user had the correct password."""
+    
+    def password_entered():
+        """Checks whether a password entered by the user is correct."""
+        if st.session_state["password"] == st.secrets.get("app_password", "trading123"):
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # Don't store password
+        else:
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        # First run, show password input
+        st.markdown("""
+            <style>
+            .main {
+                background: linear-gradient(135deg, #0a0e0f 0%, #0f1419 100%);
+                background-attachment: fixed;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("<h1 style='text-align: center; color: #00ff88;'>🔒 Trading Performance Tracker</h1>", unsafe_allow_html=True)
+        st.markdown("<h3 style='text-align: center; color: #e8f5e9;'>Enter Password to Access</h3>", unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.text_input(
+                "Password", 
+                type="password", 
+                on_change=password_entered, 
+                key="password",
+                label_visibility="collapsed"
+            )
+            st.markdown("<p style='text-align: center; color: #b8c5b8; font-size: 0.9rem;'>Contact admin for access</p>", unsafe_allow_html=True)
+        return False
+    elif not st.session_state["password_correct"]:
+        # Password incorrect, show input + error
+        st.markdown("""
+            <style>
+            .main {
+                background: linear-gradient(135deg, #0a0e0f 0%, #0f1419 100%);
+                background-attachment: fixed;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("<h1 style='text-align: center; color: #00ff88;'>🔒 Trading Performance Tracker</h1>", unsafe_allow_html=True)
+        st.markdown("<h3 style='text-align: center; color: #e8f5e9;'>Enter Password to Access</h3>", unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.text_input(
+                "Password", 
+                type="password", 
+                on_change=password_entered, 
+                key="password",
+                label_visibility="collapsed"
+            )
+            st.error("😕 Password incorrect")
+            st.markdown("<p style='text-align: center; color: #b8c5b8; font-size: 0.9rem;'>Contact admin for access</p>", unsafe_allow_html=True)
+        return False
+    else:
+        # Password correct
+        return True
+
+# Check password before showing the rest of the app
+if not check_password():
+    st.stop()  # Do not continue if password is not correct
+
 # --- Custom CSS for Ultra Dark Green/Black Aesthetic ---
 st.markdown("""
     <style>
@@ -801,201 +872,84 @@ with tab2:
             use_container_width=True,
             hide_index=True
         )
-        #######
         
+        st.subheader("📈 Balance Progression")
+        
+        df_chart = df_summary.sort_values(by='Date', ascending=True)
 
-    ###
-        # --- Trade Breakdown Section (Date Filter) ---
-        st.subheader("🗓️ Trade Breakdown (CST/CDT)")
+        fig = go.Figure()
+        
+        fig.add_trace(go.Scatter(
+            x=df_chart['Date'].astype(str),
+            y=df_chart['End Bal.'],
+            mode='lines+markers',
+            name='End Balance',
+            line=dict(color='#00ff88', width=3, shape='spline'),
+            marker=dict(size=8, color='#00d97e', line=dict(color='#0a0e0f', width=2)),
+            fill='tozeroy',
+            fillcolor='rgba(0, 255, 136, 0.1)'
+        ))
+        
+        fig.add_trace(go.Scatter(
+            x=df_chart['Date'].astype(str),
+            y=df_chart['Start Bal.'],
+            mode='lines+markers',
+            name='Start Balance',
+            line=dict(color='#fbbf24', width=2, dash='dot'), 
+            marker=dict(size=6, color='#fbbf24')
+        ))
 
-        # --- Date selection ---
-        all_trade_dates = sorted(df_trades['trade_date'].dropna().unique())
-        default_date = datetime.now(CENTRAL_TZ).date()
-
-        selected_date = st.date_input(
-            "Select Trade Date",
-            value=default_date if default_date in all_trade_dates else all_trade_dates[-1] if len(all_trade_dates) > 0 else default_date,
-            min_value=min(all_trade_dates) if len(all_trade_dates) > 0 else default_date,
-            max_value=max(all_trade_dates) if len(all_trade_dates) > 0 else default_date,
-        )
-
-        # --- Filter trades for selected date ---
-        df_trades_today = df_trades[df_trades['trade_date'] == pd.to_datetime(selected_date).date()].sort_index()
-
-        if df_trades_today.empty:
-            st.info(f"ℹ️ No trades logged for {selected_date.strftime('%Y-%m-%d')}.")
+        fig.add_trace(go.Scatter(
+            x=df_chart['Date'].astype(str),
+            y=df_chart['Start Bal.'] + df_chart['Target P&L'],
+            mode='lines',
+            name='Target End Bal',
+            line=dict(color='#34d399', width=2, dash='dash')
+        ))
+        
+        if not df_chart.empty:
+            min_bal = df_chart[['End Bal.', 'Start Bal.']].min().min()
+            max_bal = df_chart[['End Bal.', 'Start Bal.']].max().max()
+            padding = (max_bal - min_bal) * 0.1 
+            y_range = [max(0, min_bal - padding), max_bal + padding]
         else:
-            df_trades_today = df_trades_today.copy()
-            df_trades_today['Trade #'] = range(1, len(df_trades_today) + 1)
-            colors_today = ['#00ff88' if x > 0 else '#ff4757' for x in df_trades_today['pnl']]
-
-            # --- Create Plotly Figure ---
-            fig_daily = go.Figure()
-
-            # Bar: Individual trade P&L
-            fig_daily.add_trace(go.Bar(
-                x=df_trades_today['Trade #'],
-                y=df_trades_today['pnl'],
-                marker_color=colors_today,
-                name='Trade P&L',
-                hovertemplate=(
-                    "<b>Trade #%{x}</b><br>"
-                    "P&L: $%{y:,.2f}<br>"
-                    "Ticker: %{customdata[0]}<br>"
-                    "Direction: %{customdata[1]}<br>"
-                    "Investment: $%{customdata[2]:,.2f}<extra></extra>"
-                ),
-                customdata=df_trades_today[['ticker', 'direction', 'investment']]
-            ))
-
-            # Line: Running cumulative P&L
-            df_trades_today['Running P&L'] = df_trades_today['pnl'].cumsum()
-            fig_daily.add_trace(go.Scatter(
-                x=df_trades_today['Trade #'],
-                y=df_trades_today['Running P&L'],
-                mode='lines+markers',
-                name='Running P&L',
-                yaxis='y2',
-                line=dict(color='#fbbf24', width=2),
-                marker=dict(size=6, color='#fbbf24')
-            ))
-
-            # --- Safe y-axis range ---
-            max_pnl = df_trades_today['pnl'].abs().max()
-            max_running = df_trades_today['Running P&L'].abs().max()
-            y_max = max(max_pnl, max_running) * 1.1
-            if pd.isna(y_max) or y_max <= 0:
-                y_max = 1.0
-
-            # --- Layout ---
-            fig_daily.update_layout(
-                title=f"Trade P&L Breakdown ({selected_date.strftime('%Y-%m-%d')})",
-                xaxis_title="Trade #",
-                hovermode='x unified',
-                yaxis=dict(
-                    title=dict(text="Individual P&L ($)", font=dict(color='#00ff88')),
-                    tickfont=dict(color='#e8f5e9'),
-                    showgrid=True,
-                    gridcolor='rgba(0, 255, 136, 0.1)',
-                    zeroline=True,
-                    zerolinecolor='rgba(0, 255, 136, 0.3)',
-                    range=[-y_max, y_max]
-                ),
-                yaxis2=dict(
-                    title=dict(text="Running P&L ($)", font=dict(color='#fbbf24')),
-                    tickfont=dict(color='#e8f5e9'),
-                    overlaying='y',
-                    side='right',
-                    showgrid=False,
-                    zeroline=True,
-                    zerolinecolor='rgba(0, 255, 136, 0.3)',
-                    range=[-y_max, y_max]
-                ),
-                xaxis=dict(
-                    showgrid=False,
-                    tickfont=dict(color='#e8f5e9'),
-                    dtick=1
-                ),
-                plot_bgcolor='#0f1419',
-                paper_bgcolor='rgba(0,0,0,0)',
-                font=dict(family="Inter, sans-serif", size=12, color="#e8f5e9"),
-                title_font=dict(size=18, color='#00ff88'),
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=1.02,
-                    xanchor="right",
-                    x=1,
-                    bgcolor='rgba(0,0,0,0)',
-                    font=dict(color="#e8f5e9")
-                ),
-                margin=dict(t=50, b=50, l=50, r=50),
-                height=420,
-            )
-
-            # --- Display chart ---
-            st.plotly_chart(fig_daily, width="stretch")
-
-            st.subheader("📈 Balance Progression")
-        
-            df_chart = df_summary.sort_values(by='Date', ascending=True)
-
-            fig = go.Figure()
-            
-            fig.add_trace(go.Scatter(
-                x=df_chart['Date'].astype(str),
-                y=df_chart['End Bal.'],
-                mode='lines+markers',
-                name='End Balance',
-                line=dict(color='#00ff88', width=3, shape='spline'),
-                marker=dict(size=8, color='#00d97e', line=dict(color='#0a0e0f', width=2)),
-                fill='tozeroy',
-                fillcolor='rgba(0, 255, 136, 0.1)'
-            ))
-            
-            fig.add_trace(go.Scatter(
-                x=df_chart['Date'].astype(str),
-                y=df_chart['Start Bal.'],
-                mode='lines+markers',
-                name='Start Balance',
-                line=dict(color='#fbbf24', width=2, dash='dot'), 
-                marker=dict(size=6, color='#fbbf24')
-            ))
-
-            fig.add_trace(go.Scatter(
-                x=df_chart['Date'].astype(str),
-                y=df_chart['Start Bal.'] + df_chart['Target P&L'],
-                mode='lines',
-                name='Target End Bal',
-                line=dict(color='#34d399', width=2, dash='dash')
-            ))
-            
-            if not df_chart.empty:
-                min_bal = df_chart[['End Bal.', 'Start Bal.']].min().min()
-                max_bal = df_chart[['End Bal.', 'Start Bal.']].max().max()
-                padding = (max_bal - min_bal) * 0.1 
-                y_range = [max(0, min_bal - padding), max_bal + padding]
-            else:
-                y_range = [0, 100]
+            y_range = [0, 100]
 
 
-            fig.update_layout(
-                title='Balance Progression Over Time',
-                xaxis_title="Date", 
-                yaxis_title="Balance ($)",
-                hovermode='x unified',
-                height=450,
-                plot_bgcolor='#0f1419', 
-                paper_bgcolor='rgba(0,0,0,0)',
-                font=dict(family="Inter, sans-serif", size=12, color="#e8f5e9"),
-                title_font=dict(size=20, color='#00ff88', family="Inter"),
-                legend=dict(
-                    orientation="h", 
-                    yanchor="bottom", y=1.02, xanchor="right", x=1, 
-                    bgcolor='rgba(0,0,0,0)',
-                    font=dict(color="#e8f5e9")
-                ),
-                xaxis=dict(
-                    showgrid=True, 
-                    gridcolor='rgba(0, 255, 136, 0.1)',
-                    tickfont=dict(color='#e8f5e9'),
-                    tickformat="%b %d<br>%Y",
-                    dtick='d' 
-                ),
-                yaxis=dict(
-                    showgrid=True, 
-                    gridcolor='rgba(0, 255, 136, 0.1)',
-                    tickfont=dict(color='#e8f5e9'),
-                    autorange=False, 
-                    range=y_range 
-                ),
-                margin=dict(t=50) 
-            )
-            st.plotly_chart(fig, use_container_width=True)
+        fig.update_layout(
+            title='Balance Progression Over Time',
+            xaxis_title="Date", 
+            yaxis_title="Balance ($)",
+            hovermode='x unified',
+            height=450,
+            plot_bgcolor='#0f1419', 
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(family="Inter, sans-serif", size=12, color="#e8f5e9"),
+            title_font=dict(size=20, color='#00ff88', family="Inter"),
+            legend=dict(
+                orientation="h", 
+                yanchor="bottom", y=1.02, xanchor="right", x=1, 
+                bgcolor='rgba(0,0,0,0)',
+                font=dict(color="#e8f5e9")
+            ),
+            xaxis=dict(
+                showgrid=True, 
+                gridcolor='rgba(0, 255, 136, 0.1)',
+                tickfont=dict(color='#e8f5e9'),
+                tickformat="%b %d<br>%Y",
+                dtick='d' 
+            ),
+            yaxis=dict(
+                showgrid=True, 
+                gridcolor='rgba(0, 255, 136, 0.1)',
+                tickfont=dict(color='#e8f5e9'),
+                autorange=False, 
+                range=y_range 
+            ),
+            margin=dict(t=50) 
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
-
-
-###
 # --- Tab 3: Performance Analytics ---
 with tab3:
     st.header("Performance Analytics")
