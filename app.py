@@ -7,6 +7,8 @@ import gspread
 import pytz 
 import numpy as np
 
+
+
 # Define the timezone for Central Time (CDT/CST)
 CENTRAL_TZ = pytz.timezone('America/Chicago')
 
@@ -743,7 +745,9 @@ with st.sidebar:
 # --- Main Page: Title and Tabs ---
 st.markdown("# 📈 Trading Performance Tracker")
 
-tab1, tab2, tab3 = st.tabs(["💵 Trade Entry", "🗓️ Daily Summary", "📊 Analytics"])
+# tab1, tab2, tab3 = st.tabs(["💵 Trade Entry", "🗓️ Daily Summary", "📊 Analytics"])
+tab1, tab2, tab3, tab4 = st.tabs(["💵 Trade Entry", "🗓️ Daily Summary", "📊 Analytics", "📡 Live Tracker"])
+
 
 # --- Tab 1: Trade Entry Form ---
 with tab1:
@@ -1370,101 +1374,130 @@ with tab3:
                 )
                 st.plotly_chart(fig_pie, use_container_width=True)
 
-        
-        # if df_summary_filtered.empty or df_trades_filtered.empty:
-        #     st.info("ℹ️ No trading data found for the selected date range.")
-            
-        # else:
-        #     col_pnl, col_winrate = st.columns(2)
-            
-        #     with col_pnl:
-        #         st.subheader("💵 Daily P&L Chart")
-                
-        #         df_chart_pnl = df_summary_filtered.sort_values(by='Date', ascending=True)
-                
-        #         colors = ['#00ff88' if x > 0 else '#ff4757' for x in df_chart_pnl['Actual P&L']]
-                
-        #         fig_pnl = go.Figure()
-                
-        #         fig_pnl.add_trace(go.Bar(
-        #             x=df_chart_pnl['Date'].astype(str),
-        #             y=df_chart_pnl['Actual P&L'],
-        #             marker_color=colors,
-        #             name='Daily P&L',
-        #             text=df_chart_pnl['Actual P&L'].apply(lambda x: f'${x:,.2f}'),
-        #             textposition='auto', 
-        #             textfont=dict(color='#0a0e0f', size=11, weight='bold'), 
-        #             marker=dict(line=dict(color='rgba(0, 0, 0, 0.3)', width=1))
-        #         ))
-                
-        #         fig_pnl.update_layout(
-        #             title=f'Daily Trading P&L ({start_date.strftime("%b %d")} - {end_date.strftime("%b %d")})',
-        #             xaxis_title="Date", 
-        #             yaxis_title="P&L ($)",
-        #             height=450,
-        #             plot_bgcolor='#0f1419',
-        #             paper_bgcolor='rgba(0,0,0,0)',
-        #             font=dict(family="Inter, sans-serif", size=12, color="#e8f5e9"),
-        #             title_font=dict(size=18, color='#00ff88', family="Inter"),
-        #             xaxis=dict(
-        #                 showgrid=True, 
-        #                 gridcolor='rgba(0, 255, 136, 0.1)',
-        #                 tickfont=dict(color='#e8f5e9'),
-        #                 tickformat="%b %d<br>%Y" ,
-        #                 dtick='d' 
-        #             ),
-        #             yaxis=dict(
-        #                 showgrid=True, 
-        #                 gridcolor='rgba(0, 255, 136, 0.1)', 
-        #                 zeroline=True, 
-        #                 zerolinecolor='rgba(0, 255, 136, 0.3)',
-        #                 tickfont=dict(color='#e8f5e9')
-        #             ),
-        #             margin=dict(t=50)
-        #         )
-        #         st.plotly_chart(fig_pnl, use_container_width=True)
-                
-        #     with col_winrate:
-        #         st.subheader("🎯 Trade Win/Loss Breakdown")
-                
-        #         df_trades_temp = df_trades_filtered.copy()
-        #         df_trades_temp['Result'] = df_trades_temp['pnl'].apply(lambda x: 'Win' if x > 0 else ('Loss' if x < 0 else 'Breakeven'))
-                
-        #         result_counts = df_trades_temp['Result'].value_counts().reset_index()
-        #         result_counts.columns = ['Result', 'Count']
+# --- Tab 4: Live Tracker ---
+import requests
+import time
 
-        #         all_results = pd.DataFrame({'Result': ['Win', 'Loss', 'Breakeven'], 'Count': [0, 0, 0]})
-        #         result_counts = pd.merge(all_results, result_counts, on='Result', how='left', suffixes=('_all', '')).fillna(0)
-        #         result_counts['Count'] = result_counts['Count_all'] + result_counts['Count'] 
-        #         result_counts = result_counts[['Result', 'Count']]
-        #         result_counts = result_counts[result_counts['Count'] > 0] 
-                
-        #         pie_colors = {
-        #             'Win': '#00ff88',
-        #             'Loss': '#ff4757',
-        #             'Breakeven': '#94a3b8'
-        #         }
-                
-        #         sorted_results = [pie_colors.get(r, '#94a3b8') for r in result_counts['Result']]
-                
-        #         fig_pie = go.Figure(data=[go.Pie(
-        #             labels=result_counts['Result'],
-        #             values=result_counts['Count'],
-        #             hole=0.4,
-        #             marker=dict(colors=sorted_results), 
-        #             textfont=dict(size=16, color='#0a0e0f', family='Inter', weight='bold'),
-        #             textinfo='label+percent'
-        #         )])
-                
-        #         fig_pie.update_layout(
-        #             title=f'Trade Outcomes ({df_trades_filtered.shape[0]} trades total)',
-        #             height=450,
-        #             plot_bgcolor='rgba(0,0,0,0)',
-        #             paper_bgcolor='rgba(0,0,0,0)',
-        #             font=dict(family="Inter, sans-serif", size=12, color="#e8f5e9"),
-        #             title_font=dict(size=18, color='#00ff88', family="Inter"),
-        #             showlegend=True,
-        #             legend=dict(font=dict(color='#e8f5e9')),
-        #             margin=dict(t=50)
-        #         )
-        #         st.plotly_chart(fig_pie, use_container_width=True)
+def calculate_rsi(prices, period=14):
+    """Compute RSI manually using pure pandas."""
+    if len(prices) < period:
+        return 50.0  # neutral
+    delta = pd.Series(prices).diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+    avg_gain = gain.rolling(window=period, min_periods=period).mean()
+    avg_loss = loss.rolling(window=period, min_periods=period).mean()
+    rs = avg_gain / avg_loss.replace(0, np.nan)
+    rsi = 100 - (100 / (1 + rs))
+    return rsi.iloc[-1] if not np.isnan(rsi.iloc[-1]) else 50.0
+
+# tab4 = st.tabs(["📡 Live Tracker"])[0]
+with tab4:
+    st.header("📡 Live Trade Tracker")
+
+    # --- User Inputs ---
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        symbol = st.text_input("Enter Trading Pair (e.g., BTCUSDT, GIGGLEUSDT)", "GIGGLEUSDT").upper()
+    with col2:
+        refresh_sec = st.number_input("Refresh Interval (sec)", 5, 120, 20)
+    with col3:
+        manual_refresh = st.button("🔄 Refresh Now")
+
+    st.markdown("---")
+
+    # --- Set Targets ---
+    colA, colB, colC, colD = st.columns(4)
+    with colA:
+        be = st.number_input("Breakeven", value=196.0)
+    with colB:
+        tp1 = st.number_input("Target 1", value=199.1)
+    with colC:
+        tp2 = st.number_input("Target 2", value=200.2)
+    with colD:
+        sl = st.number_input("Stop Loss", value=189.5)
+
+    st.markdown("---")
+
+    # --- Fetch Live Price ---
+    def get_price(symbol):
+        try:
+            url = f"https://openapi.bitunix.com/api/v1/market/ticker?symbol={symbol}"
+            response = requests.get(url, timeout=10)
+            data = response.json()
+            if data.get("data") and isinstance(data["data"], list):
+                return float(data["data"][0]["lastPrice"])
+            elif data.get("data", {}).get("lastPrice"):
+                return float(data["data"]["lastPrice"])
+        except Exception:
+            pass
+        return None
+
+    # --- Fetch recent price history (for RSI) ---
+    def get_price_history(symbol, limit=100):
+        try:
+            url = f"https://openapi.bitunix.com/api/v1/market/kline?symbol={symbol}&interval=1m&limit={limit}"
+            response = requests.get(url, timeout=10)
+            data = response.json().get("data", [])
+            prices = [float(item[4]) for item in data]  # close prices
+            return prices
+        except Exception:
+            return []
+
+    # --- Core Refresh Function ---
+    placeholder = st.empty()
+
+    def render_live_panel():
+        with placeholder.container():
+            price = get_price(symbol)
+            if price is None:
+                st.error(f"⚠️ Could not fetch live data for {symbol}")
+                return
+
+            prices = get_price_history(symbol)
+            rsi_val = round(calculate_rsi(prices), 2) if prices else 50.0
+
+            # Determine status zone
+            if price < sl:
+                zone = "❌ EXIT – Price broke support"
+                color = "#ff4d4d"
+            elif sl <= price < be:
+                zone = "🟠 WATCH – Near support zone"
+                color = "#ff9900"
+            elif be <= price < tp1:
+                zone = "🟩 HOLD – Momentum building"
+                color = "#00cc66"
+            elif tp1 <= price < tp2:
+                zone = "💎 TP1 HIT – Take 40–50% profit"
+                color = "#0099ff"
+            else:
+                zone = "🚀 TP2 Zone – Trail stop under BE"
+                color = "#33ccff"
+
+            # Display metrics
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("Current Price", f"{price:.4f}")
+            col2.metric("RSI", f"{rsi_val:.2f}")
+            col3.metric("Breakeven", f"{be:.2f}")
+            col4.metric("Stop Loss", f"{sl:.2f}")
+
+            # Display Zone Card
+            st.markdown(f"""
+            <div style='padding:15px; background-color:{color}; border-radius:12px; text-align:center; color:white; font-size:18px;'>
+                <b>{zone}</b>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Progress Bar toward TP2
+            progress_ratio = min(max((price - sl) / (tp2 - sl), 0), 1)
+            st.progress(progress_ratio)
+
+            st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+    # --- Auto Refresh Loop ---
+    if manual_refresh:
+        render_live_panel()
+    else:
+        render_live_panel()
+        time.sleep(refresh_sec)
+        st.experimental_rerun()
