@@ -1391,113 +1391,285 @@ def calculate_rsi(prices, period=14):
     rsi = 100 - (100 / (1 + rs))
     return rsi.iloc[-1] if not np.isnan(rsi.iloc[-1]) else 50.0
 
-# tab4 = st.tabs(["📡 Live Tracker"])[0]
+def get_price(symbol):
+    """Fetch current price from Bitunix API."""
+    try:
+        url = f"https://openapi.bitunix.com/api/v1/market/ticker?symbol={symbol}"
+        response = requests.get(url, timeout=10)
+        data = response.json()
+        if data.get("data") and isinstance(data["data"], list) and len(data["data"]) > 0:
+            return float(data["data"][0]["lastPrice"])
+        elif data.get("data", {}).get("lastPrice"):
+            return float(data["data"]["lastPrice"])
+    except Exception as e:
+        st.error(f"API Error: {e}")
+    return None
+
+def get_price_history(symbol, limit=100):
+    """Fetch recent price history for RSI calculation."""
+    try:
+        url = f"https://openapi.bitunix.com/api/v1/market/kline?symbol={symbol}&interval=1m&limit={limit}"
+        response = requests.get(url, timeout=10)
+        data = response.json().get("data", [])
+        prices = [float(item[4]) for item in data]  # close prices
+        return prices
+    except Exception:
+        return []
+
+def get_24h_stats(symbol):
+    """Fetch 24h high, low, volume from API."""
+    try:
+        url = f"https://openapi.bitunix.com/api/v1/market/ticker?symbol={symbol}"
+        response = requests.get(url, timeout=10)
+        data = response.json()
+        if data.get("data") and isinstance(data["data"], list) and len(data["data"]) > 0:
+            ticker = data["data"][0]
+            return {
+                'high': float(ticker.get("high24h", 0)),
+                'low': float(ticker.get("low24h", 0)),
+                'volume': float(ticker.get("volume24h", 0)),
+                'change_pct': float(ticker.get("priceChangePercent", 0))
+            }
+    except Exception:
+        pass
+    return {'high': 0, 'low': 0, 'volume': 0, 'change_pct': 0}
+
 with tab4:
     st.header("📡 Live Trade Tracker")
-
+    
+    # Initialize session state
+    if 'last_refresh_time' not in st.session_state:
+        st.session_state.last_refresh_time = time.time()
+    if 'tracker_symbol' not in st.session_state:
+        st.session_state.tracker_symbol = "GIGGLEUSDT"
+    if 'tracker_targets' not in st.session_state:
+        st.session_state.tracker_targets = {'be': 196.0, 'tp1': 199.1, 'tp2': 200.2, 'sl': 189.5}
+    
     # --- User Inputs ---
     col1, col2, col3 = st.columns(3)
     with col1:
-        symbol = st.text_input("Enter Trading Pair (e.g., BTCUSDT, GIGGLEUSDT)", "GIGGLEUSDT").upper()
+        symbol = st.text_input(
+            "Trading Pair", 
+            value=st.session_state.tracker_symbol,
+            help="e.g., BTCUSDT, GIGGLEUSDT"
+        ).upper()
+        st.session_state.tracker_symbol = symbol
+    
     with col2:
-        refresh_sec = st.number_input("Refresh Interval (sec)", 5, 120, 20)
+        refresh_sec = st.number_input(
+            "Refresh Interval (sec)", 
+            min_value=5, 
+            max_value=120, 
+            value=20,
+            help="Auto-refresh interval"
+        )
+    
     with col3:
-        manual_refresh = st.button("🔄 Refresh Now")
-
+        st.markdown("<br>", unsafe_allow_html=True)
+        auto_refresh = st.toggle("🔄 Auto-Refresh", value=False)
+    
     st.markdown("---")
-
+    
     # --- Set Targets ---
+    st.subheader("🎯 Set Your Trade Targets")
     colA, colB, colC, colD = st.columns(4)
+    
     with colA:
-        be = st.number_input("Breakeven", value=196.0)
+        be = st.number_input("💚 Breakeven", value=st.session_state.tracker_targets['be'], format="%.4f")
+        st.session_state.tracker_targets['be'] = be
     with colB:
-        tp1 = st.number_input("Target 1", value=199.1)
+        tp1 = st.number_input("🎯 Target 1", value=st.session_state.tracker_targets['tp1'], format="%.4f")
+        st.session_state.tracker_targets['tp1'] = tp1
     with colC:
-        tp2 = st.number_input("Target 2", value=200.2)
+        tp2 = st.number_input("🚀 Target 2", value=st.session_state.tracker_targets['tp2'], format="%.4f")
+        st.session_state.tracker_targets['tp2'] = tp2
     with colD:
-        sl = st.number_input("Stop Loss", value=189.5)
-
+        sl = st.number_input("🛑 Stop Loss", value=st.session_state.tracker_targets['sl'], format="%.4f")
+        st.session_state.tracker_targets['sl'] = sl
+    
     st.markdown("---")
-
-    # --- Fetch Live Price ---
-    def get_price(symbol):
-        try:
-            url = f"https://openapi.bitunix.com/api/v1/market/ticker?symbol={symbol}"
-            response = requests.get(url, timeout=10)
-            data = response.json()
-            if data.get("data") and isinstance(data["data"], list):
-                return float(data["data"][0]["lastPrice"])
-            elif data.get("data", {}).get("lastPrice"):
-                return float(data["data"]["lastPrice"])
-        except Exception:
-            pass
-        return None
-
-    # --- Fetch recent price history (for RSI) ---
-    def get_price_history(symbol, limit=100):
-        try:
-            url = f"https://openapi.bitunix.com/api/v1/market/kline?symbol={symbol}&interval=1m&limit={limit}"
-            response = requests.get(url, timeout=10)
-            data = response.json().get("data", [])
-            prices = [float(item[4]) for item in data]  # close prices
-            return prices
-        except Exception:
-            return []
-
-    # --- Core Refresh Function ---
-    placeholder = st.empty()
-
-    def render_live_panel():
-        with placeholder.container():
-            price = get_price(symbol)
-            if price is None:
-                st.error(f"⚠️ Could not fetch live data for {symbol}")
-                return
-
+    
+    # --- Manual Refresh Button ---
+    manual_refresh = st.button("🔄 Refresh Now", type="primary", use_container_width=False)
+    
+    # --- Main Display Area ---
+    display_placeholder = st.empty()
+    
+    # --- Check if we should refresh ---
+    current_time = time.time()
+    time_since_refresh = current_time - st.session_state.last_refresh_time
+    should_refresh = manual_refresh or (auto_refresh and time_since_refresh >= refresh_sec)
+    
+    if should_refresh:
+        st.session_state.last_refresh_time = current_time
+    
+    # --- Render Live Panel ---
+    with display_placeholder.container():
+        # Fetch live data
+        price = get_price(symbol)
+        
+        if price is None:
+            st.error(f"⚠️ Could not fetch live data for **{symbol}**")
+            st.info("💡 **Troubleshooting Tips:**\n- Check if the symbol is correct (e.g., BTCUSDT, ETHUSDT)\n- Verify your internet connection\n- The Bitunix API may be temporarily unavailable")
+        else:
+            # Get additional data
             prices = get_price_history(symbol)
             rsi_val = round(calculate_rsi(prices), 2) if prices else 50.0
-
-            # Determine status zone
+            stats_24h = get_24h_stats(symbol)
+            
+            # Calculate zone and color
             if price < sl:
-                zone = "❌ EXIT – Price broke support"
-                color = "#ff4d4d"
+                zone = "❌ EXIT ZONE"
+                zone_desc = "Price broke below stop loss"
+                color = "#ff4757"
+                recommendation = "🚨 **Action:** Exit position immediately to limit losses"
             elif sl <= price < be:
-                zone = "🟠 WATCH – Near support zone"
+                zone = "🟠 DANGER ZONE"
+                zone_desc = "Price near stop loss"
                 color = "#ff9900"
+                recommendation = "⚠️ **Action:** Watch closely, consider tightening stop loss"
             elif be <= price < tp1:
-                zone = "🟩 HOLD – Momentum building"
+                zone = "🟢 SAFE ZONE"
+                zone_desc = "Above breakeven, momentum building"
                 color = "#00cc66"
+                recommendation = "✅ **Action:** Hold position, move stop to breakeven"
             elif tp1 <= price < tp2:
-                zone = "💎 TP1 HIT – Take 40–50% profit"
+                zone = "💎 TARGET 1 HIT"
+                zone_desc = "First target achieved"
                 color = "#0099ff"
+                recommendation = "💰 **Action:** Take 40-50% profit, trail stop under breakeven"
             else:
-                zone = "🚀 TP2 Zone – Trail stop under BE"
+                zone = "🚀 TARGET 2 ZONE"
+                zone_desc = "Maximum target zone"
                 color = "#33ccff"
-
-            # Display metrics
-            col1, col2, col3, col4 = st.columns(4)
-            col1.metric("Current Price", f"{price:.4f}")
-            col2.metric("RSI", f"{rsi_val:.2f}")
-            col3.metric("Breakeven", f"{be:.2f}")
-            col4.metric("Stop Loss", f"{sl:.2f}")
-
-            # Display Zone Card
+                recommendation = "🎯 **Action:** Take remaining profits, trail stop aggressively"
+            
+            # --- Display Header Card ---
             st.markdown(f"""
-            <div style='padding:15px; background-color:{color}; border-radius:12px; text-align:center; color:white; font-size:18px;'>
-                <b>{zone}</b>
+            <div style='padding:20px; background: linear-gradient(135deg, {color}20, {color}40); 
+                        border-left: 5px solid {color}; border-radius:12px; margin-bottom:20px;'>
+                <h2 style='color:{color}; margin:0; font-size:28px;'>{zone}</h2>
+                <p style='color:#e8f5e9; margin:5px 0 0 0; font-size:16px;'>{zone_desc}</p>
             </div>
             """, unsafe_allow_html=True)
-
-            # Progress Bar toward TP2
-            progress_ratio = min(max((price - sl) / (tp2 - sl), 0), 1)
-            st.progress(progress_ratio)
-
-            st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-
-    # --- Auto Refresh Loop ---
-    if manual_refresh:
-        render_live_panel()
-    else:
-        render_live_panel()
-        time.sleep(refresh_sec)
-        st.experimental_rerun()
+            
+            # --- Main Metrics ---
+            col1, col2, col3, col4, col5 = st.columns(5)
+            
+            with col1:
+                st.metric(
+                    label="💹 Current Price",
+                    value=f"${price:.4f}",
+                    delta=f"{stats_24h['change_pct']:.2f}%" if stats_24h['change_pct'] != 0 else None
+                )
+            
+            with col2:
+                rsi_color = "🔴" if rsi_val > 70 else ("🟢" if rsi_val < 30 else "🟡")
+                rsi_status = "Overbought" if rsi_val > 70 else ("Oversold" if rsi_val < 30 else "Neutral")
+                st.metric(
+                    label=f"{rsi_color} RSI (14)",
+                    value=f"{rsi_val:.2f}",
+                    help=f"Status: {rsi_status}"
+                )
+            
+            with col3:
+                st.metric(
+                    label="📈 24h High",
+                    value=f"${stats_24h['high']:.4f}" if stats_24h['high'] > 0 else "N/A"
+                )
+            
+            with col4:
+                st.metric(
+                    label="📉 24h Low",
+                    value=f"${stats_24h['low']:.4f}" if stats_24h['low'] > 0 else "N/A"
+                )
+            
+            with col5:
+                st.metric(
+                    label="📊 24h Volume",
+                    value=f"${stats_24h['volume']:,.0f}" if stats_24h['volume'] > 0 else "N/A"
+                )
+            
+            st.markdown("---")
+            
+            # --- Target Progress Visualization ---
+            st.subheader("🎯 Target Progress")
+            
+            # Calculate distances
+            dist_to_tp1 = ((tp1 - price) / price) * 100
+            dist_to_tp2 = ((tp2 - price) / price) * 100
+            dist_to_sl = ((price - sl) / price) * 100
+            
+            col_prog1, col_prog2, col_prog3 = st.columns(3)
+            
+            with col_prog1:
+                st.metric(
+                    label="🎯 Distance to TP1",
+                    value=f"{abs(dist_to_tp1):.2f}%",
+                    delta="Hit ✅" if price >= tp1 else f"{dist_to_tp1:.2f}%"
+                )
+            
+            with col_prog2:
+                st.metric(
+                    label="🚀 Distance to TP2",
+                    value=f"{abs(dist_to_tp2):.2f}%",
+                    delta="Hit ✅" if price >= tp2 else f"{dist_to_tp2:.2f}%"
+                )
+            
+            with col_prog3:
+                st.metric(
+                    label="🛑 Distance from SL",
+                    value=f"{abs(dist_to_sl):.2f}%",
+                    delta="Safe ✅" if dist_to_sl > 2 else "⚠️ Close"
+                )
+            
+            # Progress bar toward TP2
+            if tp2 > sl:
+                progress_ratio = min(max((price - sl) / (tp2 - sl), 0), 1)
+                st.progress(progress_ratio, text=f"Progress to TP2: {progress_ratio*100:.1f}%")
+            
+            st.markdown("---")
+            
+            # --- Recommendation Box ---
+            st.markdown(f"""
+            <div style='padding:15px; background-color:rgba(0, 255, 136, 0.1); 
+                        border-left:4px solid #00ff88; border-radius:10px;'>
+                <p style='color:#e8f5e9; margin:0; font-size:16px;'>{recommendation}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown("---")
+            
+            # --- Target Reference Table ---
+            with st.expander("📋 View All Targets", expanded=False):
+                target_data = pd.DataFrame({
+                    'Level': ['🛑 Stop Loss', '💚 Breakeven', '🎯 Target 1', '🚀 Target 2'],
+                    'Price': [f"${sl:.4f}", f"${be:.4f}", f"${tp1:.4f}", f"${tp2:.4f}"],
+                    'Distance': [
+                        f"{((price - sl) / price * 100):.2f}%",
+                        f"{((price - be) / price * 100):.2f}%",
+                        f"{((price - tp1) / price * 100):.2f}%",
+                        f"{((price - tp2) / price * 100):.2f}%"
+                    ],
+                    'Status': [
+                        '✅ Safe' if price > sl else '❌ Hit',
+                        '✅ Above' if price >= be else '⚠️ Below',
+                        '✅ Hit' if price >= tp1 else '⏳ Pending',
+                        '✅ Hit' if price >= tp2 else '⏳ Pending'
+                    ]
+                })
+                st.dataframe(target_data, use_container_width=True, hide_index=True)
+            
+            # --- Timestamp ---
+            last_update = datetime.now(CENTRAL_TZ).strftime('%Y-%m-%d %H:%M:%S %Z')
+            
+            if auto_refresh:
+                next_refresh_in = int(refresh_sec - time_since_refresh)
+                st.caption(f"🕐 Last updated: {last_update} | Next refresh in: {max(0, next_refresh_in)}s")
+            else:
+                st.caption(f"🕐 Last updated: {last_update} | Auto-refresh: OFF")
+    
+    # --- Auto-refresh logic ---
+    if auto_refresh and time_since_refresh >= refresh_sec:
+        time.sleep(1)  # Small delay to prevent hammering
+        st.rerun()
