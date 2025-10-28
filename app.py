@@ -1374,6 +1374,80 @@ with tab3:
                 )
                 st.plotly_chart(fig_pie, use_container_width=True)
 
+# --- TAB 5: Position Sizing Calculator ---
+import math
+
+tab5 = st.tabs(["📈 Position Sizing Calculator"])[0]
+
+with tab5:
+    st.subheader("Cross Margin Averaging & Position Sizing Calculator")
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        portfolio = st.number_input("Portfolio Size ($)", value=2580.0, step=100.0)
+    with col2:
+        leverage = st.number_input("Leverage (×)", value=50, step=10)
+    with col3:
+        coin = st.text_input("Coin / Pair", value="FARTCOIN")
+
+    st.markdown("### Averaging Setup")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        starter_pct = st.number_input("Starter % of Portfolio", value=2.0, step=0.5)
+    with c2:
+        add1_pct = st.number_input("Add-1 % of Portfolio", value=2.0, step=0.5)
+    with c3:
+        add2_pct = st.number_input("Add-2 % of Portfolio", value=3.0, step=0.5)
+
+    st.markdown("### Add Distances (Price Move vs Entry)")
+    d1, d2 = st.columns(2)
+    with d1:
+        add1_drop = st.number_input("Add-1 Trigger (% drop)", value=1.0, step=0.5)
+    with d2:
+        add2_drop = st.number_input("Add-2 Trigger (% drop)", value=2.0, step=0.5)
+
+    # --- Calculations ---
+    starter_margin = portfolio * starter_pct / 100
+    add1_margin = portfolio * add1_pct / 100
+    add2_margin = portfolio * add2_pct / 100
+    total_margin = starter_margin + add1_margin + add2_margin
+
+    starter_notional = starter_margin * leverage
+    add1_notional = add1_margin * leverage
+    add2_notional = add2_margin * leverage
+    total_notional = total_margin * leverage
+
+    # Simple avg entry improvement estimate
+    avg_improve = ((add1_drop * add1_margin) + (add2_drop * add2_margin)) / (starter_margin + add1_margin + add2_margin)
+
+    # --- Display ---
+    st.markdown("### 📊 Position Plan")
+    st.table({
+        "Stage": ["Starter", "Add-1", "Add-2", "Total"],
+        "Margin ($)": [starter_margin, add1_margin, add2_margin, total_margin],
+        f"Exposure @ {int(leverage)}× ($)": [starter_notional, add1_notional, add2_notional, total_notional],
+        "Portfolio %": [starter_pct, add1_pct, add2_pct, starter_pct + add1_pct + add2_pct],
+    })
+
+    st.metric("Total Margin Used", f"${total_margin:,.2f}")
+    st.metric("Total Exposure", f"${total_notional:,.0f}")
+    st.metric("Avg Entry Improves By", f"~{avg_improve:.2f}%")
+
+    st.markdown("### Suggested Profit-Taking Zones")
+    st.info("""
+    • **Scale-out 1:** +25 – 40 % gain → close ¾  
+    • **Scale-out 2:** +60 – 100 % gain → close rest / lotto  
+    • **Max exposure cap:** ≈ 7 % of portfolio (${})  
+    """.format(round(portfolio * 0.07, 2)))
+
+    # Optional visual
+    import plotly.graph_objects as go
+    fig = go.Figure()
+    fig.add_bar(x=["Starter", "Add-1", "Add-2"], y=[starter_margin, add1_margin, add2_margin], name="Margin Used")
+    fig.update_layout(title="Margin Exposure per Add", yaxis_title="USD", xaxis_title="Stage", template="plotly_dark")
+    st.plotly_chart(fig, use_container_width=True)
+
+
 # --- Tab 4: Live Tracker ---
 import requests
 import time
