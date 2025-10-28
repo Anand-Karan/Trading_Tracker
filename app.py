@@ -465,7 +465,9 @@ def write_data_to_sheet(sheet_name, df, mode='append'):
             full_data = [header] + data_to_write
             
             worksheet.clear()
-            worksheet.update('A1', full_data, value_input_option='USER_ENTERED')
+            # worksheet.update('A1', full_data, value_input_option='USER_ENTERED')
+            worksheet.update(values=full_data, range_name='A1', value_input_option='USER_ENTERED')
+
         
         get_data_from_sheet.clear()
         
@@ -751,7 +753,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "💵 Trade Entry",
     "🗓️ Daily Summary",
     "📊 Analytics",
-    "📈 Position Sizing Calculator"
+    "📈 Position Sizing Calculator",
     "📡 Live Tracker"
     
 ])
