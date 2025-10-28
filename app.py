@@ -746,7 +746,16 @@ with st.sidebar:
 st.markdown("# 📈 Trading Performance Tracker")
 
 # tab1, tab2, tab3 = st.tabs(["💵 Trade Entry", "🗓️ Daily Summary", "📊 Analytics"])
-tab1, tab2, tab3, tab4 = st.tabs(["💵 Trade Entry", "🗓️ Daily Summary", "📊 Analytics", "📡 Live Tracker"])
+# tab1, tab2, tab3, tab4 = st.tabs(["💵 Trade Entry", "🗓️ Daily Summary", "📊 Analytics", "📡 Live Tracker"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "💵 Trade Entry",
+    "🗓️ Daily Summary",
+    "📊 Analytics",
+    "📈 Position Sizing Calculator"
+    "📡 Live Tracker"
+    
+])
+
 
 
 # --- Tab 1: Trade Entry Form ---
@@ -1374,12 +1383,12 @@ with tab3:
                 )
                 st.plotly_chart(fig_pie, use_container_width=True)
 
-# --- TAB 5: Position Sizing Calculator ---
+# --- TAB 4: Position Sizing Calculator ---
 import math
 
-tab5 = st.tabs(["📈 Position Sizing Calculator"])[0]
+# tab5 = st.tabs(["📈 Position Sizing Calculator"])[0]
 
-with tab5:
+with tab4:
     st.subheader("Cross Margin Averaging & Position Sizing Calculator")
 
     col1, col2, col3 = st.columns(3)
@@ -1448,7 +1457,7 @@ with tab5:
     st.plotly_chart(fig, use_container_width=True)
 
 
-# --- Tab 4: Live Tracker ---
+# --- Tab 5: Live Tracker ---
 import requests
 import time
 
@@ -1508,7 +1517,7 @@ def get_24h_stats(symbol):
         pass
     return {'high': 0, 'low': 0, 'volume': 0, 'change_pct': 0}
 
-with tab4:
+with tab5:
     st.header("📡 Live Trade Tracker")
     
     # Initialize session state
