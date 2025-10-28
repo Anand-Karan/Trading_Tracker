@@ -1385,23 +1385,76 @@ with tab3:
                 )
                 st.plotly_chart(fig_pie, use_container_width=True)
 
-# --- TAB 4: Position Sizing Calculator ---
+# --- TAB 4: Smart Position Sizing Calculator (Direction Aware) ---
+import requests
 import math
 
-# tab5 = st.tabs(["📈 Position Sizing Calculator"])[0]
+def get_live_price(symbol):
+    """Fetch latest coin price from Bitunix API."""
+    try:
+        url = f"https://openapi.bitunix.com/api/v1/market/ticker?symbol={symbol.upper()}"
+        response = requests.get(url, timeout=10)
+        data = response.json()
+        if data.get("data"):
+            if isinstance(data["data"], list) and len(data["data"]) > 0:
+                return float(data["data"][0]["lastPrice"])
+            elif isinstance(data["data"], dict):
+                return float(data["data"].get("lastPrice", 0))
+    except Exception:
+        return None
+    return None
+
 
 with tab4:
-    st.subheader("Cross Margin Averaging & Position Sizing Calculator")
+    st.subheader("📈 Cross Margin Averaging & Position Sizing Calculator")
 
+    # --- Fetch latest portfolio dynamically ---
+    if not df_summary.empty and "End Bal." in df_summary.columns:
+        current_portfolio = float(df_summary["End Bal."].iloc[-1])
+    else:
+        current_portfolio = 2500.0  # fallback
+
+    st.markdown(
+        f"💰 **Current Balance (auto-fetched):** `${current_portfolio:,.2f}`"
+    )
+
+    # --- Inputs ---
     col1, col2, col3 = st.columns(3)
     with col1:
-        portfolio = st.number_input("Portfolio Size ($)", value=2580.0, step=100.0)
+        portfolio = st.number_input(
+            "Portfolio Size ($)",
+            value=current_portfolio,
+            step=100.0,
+            help="Auto-fetched from your daily summary; you can adjust manually"
+        )
     with col2:
-        leverage = st.number_input("Leverage (×)", value=50, step=10)
+        leverage = st.number_input("Leverage (×)", value=50, step=5)
     with col3:
-        coin = st.text_input("Coin / Pair", value="FARTCOIN")
+        coin = st.text_input("Coin / Pair", value="FARTCOINUSDT")
 
-    st.markdown("### Averaging Setup")
+    # --- Direction + Price ---
+    col4, col5, col6 = st.columns(3)
+    with col4:
+        direction = st.selectbox("Position Direction", ["Long", "Short"])
+    with col5:
+        fetch_live = st.checkbox("Fetch Live Coin Price (Bitunix)", value=True)
+    with col6:
+        entry_price = st.number_input("Entry Price ($)", value=0.0, step=0.0001, format="%.4f")
+
+    # --- Fetch live price if requested ---
+    live_price = None
+    if fetch_live:
+        live_price = get_live_price(coin)
+        if live_price:
+            entry_price = live_price
+            st.success(f"✅ Live Price: ${entry_price:,.4f}")
+        else:
+            st.warning("⚠️ Could not fetch live price. Enter manually.")
+
+    st.markdown("---")
+
+    # --- Averaging Setup ---
+    st.markdown("### ⚙️ Averaging Setup")
     c1, c2, c3 = st.columns(3)
     with c1:
         starter_pct = st.number_input("Starter % of Portfolio", value=2.0, step=0.5)
@@ -1410,14 +1463,19 @@ with tab4:
     with c3:
         add2_pct = st.number_input("Add-2 % of Portfolio", value=3.0, step=0.5)
 
-    st.markdown("### Add Distances (Price Move vs Entry)")
     d1, d2 = st.columns(2)
     with d1:
-        add1_drop = st.number_input("Add-1 Trigger (% drop)", value=1.0, step=0.5)
+        add1_change = st.number_input(
+            "Add-1 Trigger (% price move)", value=1.0, step=0.5,
+            help="For Long = drop %, For Short = rise %"
+        )
     with d2:
-        add2_drop = st.number_input("Add-2 Trigger (% drop)", value=2.0, step=0.5)
+        add2_change = st.number_input(
+            "Add-2 Trigger (% price move)", value=2.0, step=0.5,
+            help="For Long = drop %, For Short = rise %"
+        )
 
-    # --- Calculations ---
+    # --- Core Margin & Exposure Calculations ---
     starter_margin = portfolio * starter_pct / 100
     add1_margin = portfolio * add1_pct / 100
     add2_margin = portfolio * add2_pct / 100
@@ -1428,35 +1486,104 @@ with tab4:
     add2_notional = add2_margin * leverage
     total_notional = total_margin * leverage
 
-    # Simple avg entry improvement estimate
-    avg_improve = ((add1_drop * add1_margin) + (add2_drop * add2_margin)) / (starter_margin + add1_margin + add2_margin)
+    avg_improve = ((add1_change * add1_margin) + (add2_change * add2_margin)) / (
+        starter_margin + add1_margin + add2_margin
+    )
 
-    # --- Display ---
-    st.markdown("### 📊 Position Plan")
-    st.table({
+    # --- Compute New Avg Entry Prices (Direction Aware) ---
+    if entry_price > 0:
+        if direction == "Long":
+            price_add1 = entry_price * (1 - add1_change / 100)
+            price_add2 = entry_price * (1 - add2_change / 100)
+        else:
+            price_add1 = entry_price * (1 + add1_change / 100)
+            price_add2 = entry_price * (1 + add2_change / 100)
+
+        # Starter only
+        avg1 = entry_price
+
+        # After Add-1
+        total1 = starter_notional + add1_notional
+        avg2 = ((starter_notional * entry_price) + (add1_notional * price_add1)) / total1
+
+        # After Add-2
+        total2 = starter_notional + add1_notional + add2_notional
+        avg3 = (
+            (starter_notional * entry_price)
+            + (add1_notional * price_add1)
+            + (add2_notional * price_add2)
+        ) / total2
+    else:
+        price_add1 = price_add2 = avg1 = avg2 = avg3 = 0.0
+
+    # --- Display Summary ---
+    st.markdown("### 📊 Position Plan Summary")
+    plan_df = pd.DataFrame({
         "Stage": ["Starter", "Add-1", "Add-2", "Total"],
         "Margin ($)": [starter_margin, add1_margin, add2_margin, total_margin],
         f"Exposure @ {int(leverage)}× ($)": [starter_notional, add1_notional, add2_notional, total_notional],
         "Portfolio %": [starter_pct, add1_pct, add2_pct, starter_pct + add1_pct + add2_pct],
     })
+    st.dataframe(plan_df, hide_index=True, use_container_width=True)
 
     st.metric("Total Margin Used", f"${total_margin:,.2f}")
     st.metric("Total Exposure", f"${total_notional:,.0f}")
     st.metric("Avg Entry Improves By", f"~{avg_improve:.2f}%")
 
-    st.markdown("### Suggested Profit-Taking Zones")
-    st.info("""
-    • **Scale-out 1:** +25 – 40 % gain → close ¾  
-    • **Scale-out 2:** +60 – 100 % gain → close rest / lotto  
-    • **Max exposure cap:** ≈ 7 % of portfolio (${})  
-    """.format(round(portfolio * 0.07, 2)))
+    # --- Show Average Entry Evolution ---
+    if entry_price > 0:
+        st.markdown("### 🎯 Average Entry Evolution")
 
-    # Optional visual
-    import plotly.graph_objects as go
+        avg_df = pd.DataFrame({
+            "Stage": ["Starter", "Add-1", "Add-2"],
+            "Price ($)": [entry_price, price_add1, price_add2],
+            "New Avg Entry ($)": [avg1, avg2, avg3],
+        })
+
+        st.dataframe(avg_df.style.format({
+            "Price ($)": "{:.6f}",
+            "New Avg Entry ($)": "{:.6f}"
+        }), use_container_width=True, hide_index=True)
+
+        if direction == "Long":
+            st.info(f"📉 Each add lowers your avg entry to **${avg3:.6f}**, giving more cushion if price bounces.")
+        else:
+            st.info(f"📈 Each add raises your avg entry to **${avg3:.6f}**, strengthening your short if price drops later.")
+
+    # --- Estimated Position Size ---
+    if entry_price > 0:
+        total_units = total_notional / entry_price
+        st.success(
+            f"💡 Estimated total **{coin}** position size: **{total_units:,.2f} units** @ ${entry_price:,.4f}"
+        )
+
+    # --- Profit Zones ---
+    st.markdown("### 🧭 Suggested Profit-Taking Zones")
+    st.success(
+        f"""
+        • **Scale-out 1:** +25 – 40 % → close ¾ position  
+        • **Scale-out 2:** +60 – 100 % → close rest or hold runner  
+        • **Max exposure cap:** ≈ 7 % of portfolio → ${round(portfolio * 0.07, 2):,.2f}
+        """
+    )
+
+    # --- Visualization ---
     fig = go.Figure()
-    fig.add_bar(x=["Starter", "Add-1", "Add-2"], y=[starter_margin, add1_margin, add2_margin], name="Margin Used")
-    fig.update_layout(title="Margin Exposure per Add", yaxis_title="USD", xaxis_title="Stage", template="plotly_dark")
+    fig.add_bar(
+        x=["Starter", "Add-1", "Add-2"],
+        y=[starter_margin, add1_margin, add2_margin],
+        name="Margin Used",
+        marker_color=["#00ff88", "#00d97e", "#34d399"]
+    )
+    fig.update_layout(
+        title="Margin Allocation per Entry Stage",
+        yaxis_title="Margin ($)",
+        xaxis_title="Stage",
+        template="plotly_dark",
+        height=400
+    )
     st.plotly_chart(fig, use_container_width=True)
+
 
 
 # --- Tab 5: Live Tracker ---
