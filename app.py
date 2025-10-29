@@ -947,10 +947,6 @@ with tab2:
             hide_index=True
         )
 
-        #######
-        
-
-    ###
         # --- Trade Breakdown Section (Date Filter) ---
         st.subheader("🗓️ Trade Breakdown (CST/CDT)")
 
@@ -1013,6 +1009,10 @@ with tab2:
             if pd.isna(y_max) or y_max <= 0:
                 y_max = 1.0
 
+            # --- Determine x-axis range (default 1-10, expand if needed) ---
+            num_trades_today = len(df_trades_today)
+            x_axis_range = [0.5, max(10.5, num_trades_today + 0.5)]
+            
             # --- Layout ---
             fig_daily.update_layout(
                 title=f"Trade P&L Breakdown ({selected_date.strftime('%Y-%m-%d')})",
@@ -1040,7 +1040,8 @@ with tab2:
                 xaxis=dict(
                     showgrid=False,
                     tickfont=dict(color='#e8f5e9'),
-                    dtick=1
+                    dtick=1,
+                    range=x_axis_range
                 ),
                 plot_bgcolor='#0f1419',
                 paper_bgcolor='rgba(0,0,0,0)',
@@ -1060,9 +1061,7 @@ with tab2:
             )
 
             # --- Display chart ---
-            st.plotly_chart(fig_daily, width="stretch")
-
-            #############
+            st.plotly_chart(fig_daily, use_container_width=True)
         
         st.subheader("📈 Balance Progression")
         
@@ -1105,7 +1104,6 @@ with tab2:
             y_range = [max(0, min_bal - padding), max_bal + padding]
         else:
             y_range = [0, 100]
-
 
         fig.update_layout(
             title='Balance Progression Over Time',
