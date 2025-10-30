@@ -1142,246 +1142,148 @@ with tab2:
 # --- Tab 3: Performance Analytics ---
 with tab3:
     st.header("Performance Analytics")
-    
+
     if df_trades.empty:
         st.info("ℹ️ No trade data yet. Start logging trades to see analytics!")
     else:
-        
-        all_dates_summary = df_summary['Date'].unique()
-        all_dates_trades = df_trades['trade_date'].unique()
-        
-        all_available_dates = pd.to_datetime(list(all_dates_summary) + list(all_dates_trades)).unique()
-        
-        min_date_overall = min(all_available_dates) if len(all_available_dates) > 0 else datetime.now(CENTRAL_TZ).date()
-        max_date_overall = max(all_available_dates) if len(all_available_dates) > 0 else datetime.now(CENTRAL_TZ).date()
-        
-        # col_start_date, col_end_date = st.columns(2)
-        
-        # with col_start_date:
-        #     start_date = st.date_input("Start Date", value=min_date_overall, min_value=min_date_overall, max_value=max_date_overall)
-        
-        # with col_end_date:
-        #     end_date = st.date_input("End Date", value=max_date_overall, min_value=min_date_overall, max_value=max_date_overall)
 
+        # ---- Date Range + Week + Ticker Filters ----
+        all_dates = pd.to_datetime(
+            list(df_summary['Date'].unique()) + 
+            list(df_trades['trade_date'].unique())
+        ).unique()
 
-        # --- Date Range Filters ---
+        min_date_overall = min(all_dates)
+        max_date_overall = max(all_dates)
+
         col1, col2, col3 = st.columns(3)
-
         with col1:
             start_date = st.date_input("Start Date", value=min_date_overall, min_value=min_date_overall, max_value=max_date_overall)
-
         with col2:
             end_date = st.date_input("End Date", value=max_date_overall, min_value=min_date_overall, max_value=max_date_overall)
-
         with col3:
-            # Week filter (multi-select)
             available_weeks = sorted(df_summary['Week'].unique())
             selected_weeks = st.multiselect("Filter by Week #", available_weeks, default=available_weeks)
 
-        # --- Ticker Filter (Multi-select) ---
-        unique_tickers = sorted(df_trades['ticker'].dropna().unique()) if 'ticker' in df_trades.columns else []
-        selected_tickers = st.multiselect(
-            "Filter by Ticker(s)", 
-            options=unique_tickers, 
-            default=unique_tickers,
-            help="Select one or more tickers to focus your analysis."
-        )
+        unique_tickers = sorted(df_trades['ticker'].dropna().unique())
+        selected_tickers = st.multiselect("Filter by Ticker(s)", options=unique_tickers, default=unique_tickers)
 
-        # --- Apply Filters ---
+        # ---- Apply Filters ----
         if start_date > end_date:
-            st.error("❌ Error: Start Date must be before or the same as End Date.")
-            df_summary_filtered = pd.DataFrame()
-            df_trades_filtered = pd.DataFrame()
-        else:
-            df_summary_filtered = df_summary[
-                (df_summary['Date'] >= start_date) & 
-                (df_summary['Date'] <= end_date) & 
-                (df_summary['Week'].isin(selected_weeks))
-            ]
+            st.error("Start Date must be before End Date")
+            st.stop()
 
-            df_trades_filtered = df_trades[
-                (df_trades['trade_date'] >= start_date) & 
-                (df_trades['trade_date'] <= end_date)
-            ]
-            if len(selected_tickers) > 0:
-                df_trades_filtered = df_trades_filtered[df_trades_filtered['ticker'].isin(selected_tickers)]
+        df_summary_filtered = df_summary[
+            (df_summary['Date'] >= start_date) &
+            (df_summary['Date'] <= end_date) &
+            (df_summary['Week'].isin(selected_weeks))
+        ]
 
-        #########
-        if start_date > end_date:
-            st.error("❌ Error: Start Date must be before or the same as End Date.")
-            df_summary_filtered = pd.DataFrame()
-            df_trades_filtered = pd.DataFrame()
-        else:
-            df_summary_filtered = df_summary[
-                (df_summary['Date'] >= start_date) & 
-                (df_summary['Date'] <= end_date)
-            ]
-            
-            df_trades_filtered = df_trades[
-                (df_trades['trade_date'] >= start_date) & 
-                (df_trades['trade_date'] <= end_date)
-            ]
+        df_trades_filtered = df_trades[
+            (df_trades['trade_date'] >= start_date) &
+            (df_trades['trade_date'] <= end_date)
+        ]
 
-        st.markdown("---")
+        if len(selected_tickers) > 0:
+            df_trades_filtered = df_trades_filtered[df_trades_filtered['ticker'].isin(selected_tickers)]
 
+        # ---- Recompute daily P&L from filtered trades ----
+        if not df_trades_filtered.empty:
+            daily_trade_perf = (
+                df_trades_filtered.groupby('trade_date', as_index=False)['pnl']
+                .sum()
+                .rename(columns={'trade_date': 'Date', 'pnl': 'Actual P&L'})
+            )
 
-        # --- Apply Filters with Ticker + Week Support ---
-        if start_date > end_date:
-            st.error("❌ Error: Start Date must be before or the same as End Date.")
-            df_summary_filtered = pd.DataFrame()
-            df_trades_filtered = pd.DataFrame()
-        else:
-            # --- Filter daily summary by date + week ---
-            df_summary_filtered = df_summary[
-                (df_summary['Date'] >= start_date)
-                & (df_summary['Date'] <= end_date)
-                & (df_summary['Week'].isin(selected_weeks))
-            ]
+            df_summary_filtered = pd.merge(
+                df_summary_filtered, daily_trade_perf,
+                on='Date', how='left', suffixes=('', '_recalc')
+            )
 
-            # --- Filter trades by date + ticker ---
-            df_trades_filtered = df_trades[
-                (df_trades['trade_date'] >= start_date)
-                & (df_trades['trade_date'] <= end_date)
-            ]
-            if len(selected_tickers) > 0:
-                df_trades_filtered = df_trades_filtered[
-                    df_trades_filtered['ticker'].isin(selected_tickers)
-                ]
+            df_summary_filtered['Actual P&L'] = df_summary_filtered['Actual P&L_recalc'].fillna(
+                df_summary_filtered['Actual P&L']
+            )
+            df_summary_filtered.drop(columns=['Actual P&L_recalc'], inplace=True)
 
-            # ✅ If ticker filter applied, recompute daily P&L from filtered trades
-            if not df_trades_filtered.empty:
-                daily_trade_perf = (
-                    df_trades_filtered.groupby('trade_date', as_index=False)['pnl']
-                    .sum()
-                    .rename(columns={'trade_date': 'Date', 'pnl': 'Actual P&L'})
-                )
+        st.caption(f"📅 {start_date} → {end_date} | 🧾 Weeks: {', '.join(selected_weeks)} | 🏷️ Tickers: {', '.join(selected_tickers)}")
 
-                # Merge new daily P&L into summary
-                df_summary_filtered = pd.merge(
-                    df_summary_filtered,
-                    daily_trade_perf,
-                    on='Date',
-                    how='left',
-                    suffixes=('', '_from_trades')
-                )
-
-                # Replace Actual P&L with filtered ticker-based value
-                if 'Actual P&L_from_trades' in df_summary_filtered.columns:
-                    df_summary_filtered['Actual P&L'] = df_summary_filtered[
-                        'Actual P&L_from_trades'
-                    ].fillna(df_summary_filtered['Actual P&L'])
-                    df_summary_filtered.drop(columns=['Actual P&L_from_trades'], inplace=True)
-
-        # --- Summary Caption ---
-        st.caption(
-            f"📅 Showing data from **{start_date}** to **{end_date}** | "
-            f"🧾 Weeks: {', '.join(selected_weeks) if selected_weeks else 'All'} | "
-            f"🏷️ Tickers: {', '.join(selected_tickers) if selected_tickers else 'All'}"
-        )
-
-        # --- If no data, show info ---
         if df_summary_filtered.empty or df_trades_filtered.empty:
-            st.info("ℹ️ No trading data found for the selected filters.")
-        else:
-            # --- Main Analytics Charts ---
-            col_pnl, col_winrate = st.columns(2)
+            st.info("No trading data found for selected filters.")
+            st.stop()
 
-            with col_pnl:
-                st.subheader("💵 Daily P&L Chart")
+        # ---- Daily P&L Chart (with last 20 days sliding window) ----
+        st.subheader("💵 Daily P&L")
 
-                df_chart_pnl = df_summary_filtered.sort_values(by='Date', ascending=True)
-                colors = ['#00ff88' if x > 0 else '#ff4757' for x in df_chart_pnl['Actual P&L']]
+        df_chart = df_summary_filtered.sort_values(by='Date')
+        
+        # Slide window: last 20 days
+        if len(df_chart) > 20:
+            df_chart = df_chart.tail(20)
 
-                fig_pnl = go.Figure()
-                fig_pnl.add_trace(
-                    go.Bar(
-                        x=df_chart_pnl['Date'].astype(str),
-                        y=df_chart_pnl['Actual P&L'],
-                        marker_color=colors,
-                        name='Daily P&L',
-                        text=df_chart_pnl['Actual P&L'].apply(lambda x: f'${x:,.2f}'),
-                        textposition='auto',
-                        textfont=dict(color='#0a0e0f', size=11, weight='bold'),
-                        marker=dict(line=dict(color='rgba(0, 0, 0, 0.3)', width=1)),
-                    )
-                )
+        # Colors for bars
+        colors = ['#00ff88' if x > 0 else '#ff4757' for x in df_chart['Actual P&L']]
 
-                fig_pnl.update_layout(
-                    title=f'Daily Trading P&L ({start_date.strftime("%b %d")} - {end_date.strftime("%b %d")})',
-                    xaxis_title="Date",
-                    yaxis_title="P&L ($)",
-                    height=450,
-                    plot_bgcolor='#0f1419',
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    font=dict(family="Inter, sans-serif", size=12, color="#e8f5e9"),
-                    title_font=dict(size=18, color='#00ff88', family="Inter"),
-                    xaxis=dict(
-                        showgrid=True,
-                        gridcolor='rgba(0, 255, 136, 0.1)',
-                        tickfont=dict(color='#e8f5e9'),
-                        tickformat="%b %d<br>%Y",
-                        dtick='d',
-                    ),
-                    yaxis=dict(
-                        showgrid=True,
-                        gridcolor='rgba(0, 255, 136, 0.1)',
-                        zeroline=True,
-                        zerolinecolor='rgba(0, 255, 136, 0.3)',
-                        tickfont=dict(color='#e8f5e9'),
-                    ),
-                    margin=dict(t=50),
-                )
-                st.plotly_chart(fig_pnl, use_container_width=True)
+        fig_pnl = go.Figure()
+        fig_pnl.add_trace(go.Bar(
+            x=df_chart['Date'].astype(str),
+            y=df_chart['Actual P&L'],
+            marker_color=colors,
+            text=df_chart['Actual P&L'].apply(lambda x: f'${x:,.2f}'),
+            textposition='auto'
+        ))
 
-            with col_winrate:
-                st.subheader("🎯 Trade Win/Loss Breakdown")
+        fig_pnl.update_layout(
+            title=f"Daily P&L (Last {min(20, len(df_chart))} Days)",
+            xaxis_title="Date",
+            yaxis_title="P&L ($)",
+            height=400,
+            plot_bgcolor='#0f1419',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color="#e8f5e9"),
+            xaxis=dict(
+                tickformat="%b %d",
+                showgrid=False
+            ),
+            yaxis=dict(
+                gridcolor='rgba(0,255,136,0.1)',
+                zeroline=True,
+                zerolinecolor='rgba(0,255,136,0.3)'
+            ),
+            margin=dict(t=50)
+        )
 
-                df_trades_temp = df_trades_filtered.copy()
-                df_trades_temp['Result'] = df_trades_temp['pnl'].apply(
-                    lambda x: 'Win' if x > 0 else ('Loss' if x < 0 else 'Breakeven')
-                )
+        st.plotly_chart(fig_pnl, use_container_width=True)
 
-                result_counts = df_trades_temp['Result'].value_counts().reset_index()
-                result_counts.columns = ['Result', 'Count']
+        # ---- Pie Chart ----
+        st.subheader("🎯 Win / Loss Breakdown")
 
-                all_results = pd.DataFrame(
-                    {'Result': ['Win', 'Loss', 'Breakeven'], 'Count': [0, 0, 0]}
-                )
-                result_counts = pd.merge(
-                    all_results, result_counts, on='Result', how='left', suffixes=('_all', '')
-                ).fillna(0)
-                result_counts['Count'] = result_counts['Count_all'] + result_counts['Count']
-                result_counts = result_counts[['Result', 'Count']]
-                result_counts = result_counts[result_counts['Count'] > 0]
+        df_temp = df_trades_filtered.copy()
+        df_temp['Result'] = df_temp['pnl'].apply(lambda x: 'Win' if x > 0 else ('Loss' if x < 0 else 'Breakeven'))
 
-                pie_colors = {'Win': '#00ff88', 'Loss': '#ff4757', 'Breakeven': '#94a3b8'}
-                sorted_results = [pie_colors.get(r, '#94a3b8') for r in result_counts['Result']]
+        result_counts = df_temp['Result'].value_counts().reset_index()
+        result_counts.columns = ['Result', 'Count']
 
-                fig_pie = go.Figure(
-                    data=[
-                        go.Pie(
-                            labels=result_counts['Result'],
-                            values=result_counts['Count'],
-                            hole=0.4,
-                            marker=dict(colors=sorted_results),
-                            textfont=dict(size=16, color='#0a0e0f', family='Inter', weight='bold'),
-                            textinfo='label+percent',
-                        )
-                    ]
-                )
+        pie_colors = {'Win': '#00ff88', 'Loss': '#ff4757', 'Breakeven': '#94a3b8'}
 
-                fig_pie.update_layout(
-                    title=f'Trade Outcomes ({df_trades_filtered.shape[0]} trades total)',
-                    height=450,
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    font=dict(family="Inter, sans-serif", size=12, color="#e8f5e9"),
-                    title_font=dict(size=18, color='#00ff88', family="Inter"),
-                    showlegend=True,
-                    legend=dict(font=dict(color='#e8f5e9')),
-                    margin=dict(t=50),
-                )
-                st.plotly_chart(fig_pie, use_container_width=True)
+        fig_pie = go.Figure(
+            go.Pie(
+                labels=result_counts['Result'],
+                values=result_counts['Count'],
+                hole=0.4,
+                marker=dict(colors=[pie_colors.get(i) for i in result_counts['Result']]),
+                textinfo='label+percent'
+            )
+        )
+
+        fig_pie.update_layout(
+            title=f"Trade Outcomes ({df_trades_filtered.shape[0]} trades)",
+            height=380,
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color="#e8f5e9")
+        )
+
+        st.plotly_chart(fig_pie, use_container_width=True)
+
 
 # --- TAB 4: Smart Position Sizing Calculator (Direction Aware) ---
 import requests
