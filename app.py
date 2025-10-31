@@ -842,6 +842,10 @@ with tab1:
             pnl_pct = st.number_input("📊 P&L %", help="e.g., 5.5 for 5.5%", format="%.2f")
         
         st.markdown("---")
+        
+
+        tz = pytz.timezone("America/Chicago")  # CST/CDT
+
         submitted = st.form_submit_button("✅ Submit Trade", type="primary", use_container_width=True)
 
         if submitted:
@@ -850,8 +854,11 @@ with tab1:
             elif investment <= 0:
                 st.error("❌ Investment must be greater than zero.")
             else:
+                exit_timestamp = datetime.now(tz)
+
                 new_trade_data = pd.DataFrame([{
                     'trade_date': trade_date.strftime("%Y-%m-%d"),
+                    'exit_time': exit_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
                     'ticker': ticker.upper(),
                     'leverage': leverage,
                     'direction': direction,
@@ -861,10 +868,34 @@ with tab1:
                 }])
                 
                 if write_data_to_sheet('trades', new_trade_data, mode='append'):
-                    st.success("✅ Trade successfully logged!")
+                    st.success(f"✅ Trade logged at {exit_timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
                     st.rerun()
                 else:
                     st.error("❌ Failed to log trade to Google Sheet.")
+
+        # submitted = st.form_submit_button("✅ Submit Trade", type="primary", use_container_width=True)
+
+        # if submitted:
+        #     if not ticker.strip():
+        #         st.error("❌ Ticker cannot be empty.")
+        #     elif investment <= 0:
+        #         st.error("❌ Investment must be greater than zero.")
+        #     else:
+        #         new_trade_data = pd.DataFrame([{
+        #             'trade_date': trade_date.strftime("%Y-%m-%d"),
+        #             'ticker': ticker.upper(),
+        #             'leverage': leverage,
+        #             'direction': direction,
+        #             'investment': investment,
+        #             'pnl': pnl,
+        #             'pnl_pct': pnl_pct,
+        #         }])
+                
+        #         if write_data_to_sheet('trades', new_trade_data, mode='append'):
+        #             st.success("✅ Trade successfully logged!")
+        #             st.rerun()
+        #         else:
+        #             st.error("❌ Failed to log trade to Google Sheet.")
 
 # --- Deposit / Bonus Entry ---
 with st.expander("💵 Add Deposit or Bonus", expanded=False):
