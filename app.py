@@ -1254,6 +1254,58 @@ with tab3:
 
         st.plotly_chart(fig_pnl, use_container_width=True)
 
+        #########
+        # ---- Trades vs P&L Scatter Plot ----
+        st.subheader("📊 Trades vs Daily P&L")
+
+        # Group trades per day
+        df_trades_count = (
+            df_trades_filtered.groupby('trade_date')
+            .size()
+            .reset_index(name='num_trades')
+        )
+
+        # Merge with daily P&L
+        df_scatter = pd.merge(
+            df_trades_count,
+            df_summary_filtered[['Date', 'Actual P&L']],
+            left_on='trade_date',
+            right_on='Date',
+            how='left'
+        )
+
+        df_scatter.dropna(subset=['Actual P&L'], inplace=True)
+
+        # Colors: green wins, red losses
+        df_scatter['color'] = df_scatter['Actual P&L'].apply(lambda x: '#00ff88' if x > 0 else '#ff4757')
+
+        fig_scatter = go.Figure()
+
+        fig_scatter.add_trace(go.Scatter(
+            x=df_scatter['num_trades'],
+            y=df_scatter['Actual P&L'],
+            mode='markers+text',
+            marker=dict(size=12, color=df_scatter['color']),
+            text=df_scatter['trade_date'].astype(str),
+            textposition="top center",
+            hovertemplate="<b>%{text}</b><br>Trades: %{x}<br>P&L: $%{y:.2f}<extra></extra>"
+        ))
+
+        fig_scatter.update_layout(
+            title="Trades vs Daily Profit/Loss",
+            xaxis_title="Number of Trades",
+            yaxis_title="Daily P&L ($)",
+            plot_bgcolor='#0f1419',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color="#e8f5e9"),
+            height=420,
+            xaxis=dict(showgrid=False),
+            yaxis=dict(gridcolor='rgba(0,255,136,0.1)'),
+        )
+
+        st.plotly_chart(fig_scatter, use_container_width=True)
+
+
         # ---- Pie Chart ----
         st.subheader("🎯 Win / Loss Breakdown")
 
