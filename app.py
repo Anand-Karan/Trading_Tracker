@@ -818,6 +818,56 @@ with tab1:
         st.info("No summary data for today yet. Your first trade will establish today's entry and target.")
         
     st.markdown("---") 
+    # st.markdown("---")
+
+    # ✅ Weekly Profit Box (PLACE HERE)
+    st.subheader("📆 Weekly Performance")
+
+    # list weeks available
+    available_weeks = sorted(df_summary['Week'].unique())
+
+    # default to the latest week
+    default_week = df_summary['Week'].iloc[-1] if not df_summary.empty else None
+
+    selected_week = st.selectbox("Select Week", available_weeks, index=available_weeks.index(default_week))
+
+    # filter weekly data
+    df_week = df_summary[df_summary['Week'] == selected_week]
+
+    weekly_pl = df_week['Actual P&L'].sum()
+    weekly_start = df_week['Start Bal.'].iloc[0]
+    weekly_return_pct = (weekly_pl / weekly_start * 100) if weekly_start != 0 else 0
+    weekly_trades = df_week['Trades'].sum()
+
+    # styling for gain/loss
+    pl_color = "🟢" if weekly_pl > 0 else "🔴" if weekly_pl < 0 else "⚪"
+
+    st.markdown(
+        f"""
+        <div style="
+            padding: 20px;
+            border-radius: 12px;
+            background: rgba(0,255,136,0.06);
+            border: 1px solid rgba(0,255,136,0.3);
+            margin-bottom: 10px;">
+            <h3 style='color:#00ff88;margin-bottom:6px;'>Weekly P&L — {selected_week}</h3>
+            <p style='color:#e8f5e9;font-size:18px;margin:2px 0;'>
+                {pl_color} <strong>P&L:</strong> ${weekly_pl:,.2f}
+            </p>
+            <p style='color:#e8f5e9;font-size:16px;margin:2px 0;'>
+                📈 <strong>Return:</strong> {weekly_return_pct:.2f}%
+            </p>
+            <p style='color:#e8f5e9;font-size:16px;margin:2px 0;'>
+                🔄 <strong>Total Trades:</strong> {weekly_trades}
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # ✅ Continue with trade form
+    st.header("Log a New Trade")
+
     
     st.header("Log a New Trade")
     
