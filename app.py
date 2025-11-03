@@ -562,7 +562,7 @@ def recalculate_all_summaries(initial_balance=2283.22):
             actual_pl = row['Actual P&L'] 
             start_balance = current_balance_recalc
             end_balance = start_balance + actual_pl + deposit 
-            target_pl = start_balance * 0.065
+            target_pl = start_balance * 0.04
             if start_balance <= 0:
                  target_pl = 0
             
@@ -588,7 +588,7 @@ def recalculate_all_summaries(initial_balance=2283.22):
             
             last_end_bal = df_summary['End Bal.'].iloc[-1]
             today_start_bal = last_end_bal
-            today_target_pl = today_start_bal * 0.065
+            today_target_pl = today_start_bal * 0.04
             
             new_row = pd.DataFrame([{
                 'Date': today_date_str,
