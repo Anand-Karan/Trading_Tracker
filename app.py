@@ -524,7 +524,7 @@ def recalculate_all_summaries(initial_balance=2283.22):
         
         start_balance = current_balance
         end_balance = start_balance + total_pl
-        target_pl = start_balance * 0.065
+        target_pl = start_balance * 0.04
         if start_balance <= 0: target_pl = 0
         
         week_num = datetime.combine(date, datetime.min.time()).isocalendar()[1]
