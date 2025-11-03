@@ -496,7 +496,7 @@ def recalculate_all_summaries(initial_balance=2283.22):
             'Week': [f'Wk {today_date.isocalendar()[1]}'],
             'Trades': [0],
             'Start Bal.': [initial_balance],
-            'Target P&L': [initial_balance * 0.065],
+            'Target P&L': [initial_balance * 0.04],
             'Actual P&L': [0.0],
             'Deposit/Bonus': [0.0],
             'End Bal.': [initial_balance],
