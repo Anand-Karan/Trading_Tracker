@@ -867,9 +867,6 @@ with tab1:
 
     # ✅ Continue with trade form
     st.header("Log a New Trade")
-
-    
-    st.header("Log a New Trade")
     
     with st.form("Trade Entry Form"):
         
