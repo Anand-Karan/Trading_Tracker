@@ -655,7 +655,7 @@ def load_data():
 # --- Initialize App and State ---
 
 if 'initial_balance' not in st.session_state:
-    st.session_state.initial_balance = 2272.22 
+    st.session_state.initial_balance = 1918.91 #2272.22 
 
 df_summary_temp, df_trades_temp = load_data() 
 if not df_summary_temp.empty and 'Start Bal.' in df_summary_temp.columns:
