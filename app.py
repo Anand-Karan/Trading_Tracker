@@ -485,8 +485,10 @@ def recalculate_all_summaries(initial_balance=2283.22):
     """
     Reads the full trade history, recalculates daily summaries, and updates the sheet.
     This function is run after every trade or deposit entry.
+    CRITICAL: This function now PRESERVES existing deposits instead of overwriting them.
     """
-    if not SHEET_ID: return pd.DataFrame()
+    if not SHEET_ID: 
+        return pd.DataFrame()
     
     today_date = datetime.now(CENTRAL_TZ).date()
     today_date_str = today_date.strftime("%Y-%m-%d")
@@ -518,56 +520,101 @@ def recalculate_all_summaries(initial_balance=2283.22):
     df_trades = df_trades.sort_values(by='trade_date')
     daily_groups = df_trades.groupby('trade_date')
 
+    # 🔑 CRITICAL: Load existing summary to preserve deposits
+    df_old_summary = get_data_from_sheet('daily_summary')
+    existing_deposits = {}
+    
+    if not df_old_summary.empty:
+        try:
+            df_old_summary['Date'] = pd.to_datetime(df_old_summary['Date'], errors='coerce').dt.date.astype(str)
+            df_old_summary['Deposit/Bonus'] = pd.to_numeric(df_old_summary['Deposit/Bonus'], errors='coerce').fillna(0.0)
+            
+            # Store existing deposits in a dictionary
+            for _, row in df_old_summary.iterrows():
+                existing_deposits[row['Date']] = float(row['Deposit/Bonus'])
+        except Exception:
+            pass
+
     daily_summary_list = []
     current_balance = initial_balance
     
     for date, group in daily_groups:
         total_pl = group['pnl'].sum()
         num_trades = group.shape[0]
+        date_str = date.strftime("%Y-%m-%d")
+        
+        # 🔑 PRESERVE existing deposit for this date (if any)
+        existing_deposit = existing_deposits.get(date_str, 0.0)
         
         start_balance = current_balance
-        end_balance = start_balance + total_pl
+        end_balance = start_balance + total_pl + existing_deposit  # ← Include deposit!
         target_pl = start_balance * 0.04
-        if start_balance <= 0: target_pl = 0
+        if start_balance <= 0: 
+            target_pl = 0
         
         week_num = datetime.combine(date, datetime.min.time()).isocalendar()[1]
              
         daily_summary_list.append({
-            'Date': date.strftime("%Y-%m-%d"),
+            'Date': date_str,
             'Week': f'Wk {week_num}',
             'Trades': num_trades,
             'Start Bal.': round(start_balance, 2),
             'Target P&L': round(target_pl, 2),
             'Actual P&L': round(total_pl, 2),
-            'Deposit/Bonus': 0.00,
+            'Deposit/Bonus': round(existing_deposit, 2),  # ← PRESERVE deposit!
             'End Bal.': round(end_balance, 2),
         })
-        current_balance = end_balance 
+        current_balance = end_balance
 
     df_summary = pd.DataFrame(daily_summary_list)
     df_summary['Date'] = df_summary['Date'].astype(str)
     
-    df_old_summary = get_data_from_sheet('daily_summary')
+    # 🔑 Add dates that have deposits but no trades
     if not df_old_summary.empty:
-        df_old_summary['Date'] = pd.to_datetime(df_old_summary['Date'], errors='coerce').dt.date.astype(str)
+        for date_str, deposit_amount in existing_deposits.items():
+            if deposit_amount > 0 and date_str not in df_summary['Date'].values:
+                # This date has a deposit but no trades
+                date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+                week_num = date_obj.isocalendar()[1]
+                
+                # Calculate balances
+                prev_dates = df_summary[df_summary['Date'] < date_str]
+                if not prev_dates.empty:
+                    start_balance = prev_dates['End Bal.'].iloc[-1]
+                else:
+                    start_balance = initial_balance
+                
+                end_balance = start_balance + deposit_amount
+                target_pl = start_balance * 0.04 if start_balance > 0 else 0
+                
+                new_row = {
+                    'Date': date_str,
+                    'Week': f'Wk {week_num}',
+                    'Trades': 0,
+                    'Start Bal.': round(start_balance, 2),
+                    'Target P&L': round(target_pl, 2),
+                    'Actual P&L': 0.0,
+                    'Deposit/Bonus': round(deposit_amount, 2),
+                    'End Bal.': round(end_balance, 2),
+                }
+                
+                df_summary = pd.concat([df_summary, pd.DataFrame([new_row])], ignore_index=True)
+        
+        # Re-sort by date
         df_summary['Date'] = pd.to_datetime(df_summary['Date'], errors='coerce').dt.date.astype(str)
+        df_summary = df_summary.sort_values('Date').reset_index(drop=True)
         
-        df_merged = pd.merge(df_summary, df_old_summary[['Date', 'Deposit/Bonus']], on='Date', how='left', suffixes=('_new', '_old'))
-        
-        df_merged['Deposit/Bonus'] = pd.to_numeric(df_merged['Deposit/Bonus_old'], errors='coerce').fillna(0.00)
-        
-        df_summary = df_merged[['Date', 'Week', 'Trades', 'Start Bal.', 'Target P&L', 'Actual P&L', 'Deposit/Bonus', 'End Bal.']]
-        
+        # Recalculate balances with deposits included
         current_balance_recalc = initial_balance
         new_summary_list = []
-        for index, row in df_summary.iterrows():
+        
+        for _, row in df_summary.iterrows():
             deposit = row['Deposit/Bonus']
-            actual_pl = row['Actual P&L'] 
+            actual_pl = row['Actual P&L']
+            
             start_balance = current_balance_recalc
-            end_balance = start_balance + actual_pl + deposit 
-            target_pl = start_balance * 0.04
-            if start_balance <= 0:
-                 target_pl = 0
+            end_balance = start_balance + actual_pl + deposit
+            target_pl = start_balance * 0.04 if start_balance > 0 else 0
             
             new_summary_list.append({
                 'Date': row['Date'],
@@ -579,19 +626,22 @@ def recalculate_all_summaries(initial_balance=2283.22):
                 'Deposit/Bonus': round(deposit, 2),
                 'End Bal.': round(end_balance, 2),
             })
-            current_balance_recalc = end_balance 
+            current_balance_recalc = end_balance
         
         df_summary = pd.DataFrame(new_summary_list)
         df_summary['Date'] = df_summary['Date'].astype(str)
         
+    # Add today's row if needed
     if not df_summary.empty:
         last_recorded_date_str = df_summary['Date'].iloc[-1]
         
         if last_recorded_date_str != today_date_str:
-            
             last_end_bal = df_summary['End Bal.'].iloc[-1]
             today_start_bal = last_end_bal
             today_target_pl = today_start_bal * 0.04
+            
+            # Check if today has a deposit already
+            today_deposit = existing_deposits.get(today_date_str, 0.0)
             
             new_row = pd.DataFrame([{
                 'Date': today_date_str,
@@ -600,18 +650,149 @@ def recalculate_all_summaries(initial_balance=2283.22):
                 'Start Bal.': round(today_start_bal, 2),
                 'Target P&L': round(today_target_pl, 2),
                 'Actual P&L': 0.0,
-                'Deposit/Bonus': 0.0,
-                'End Bal.': round(today_start_bal, 2),
+                'Deposit/Bonus': round(today_deposit, 2),
+                'End Bal.': round(today_start_bal + today_deposit, 2),
             }])
             
             df_summary = pd.concat([df_summary, new_row], ignore_index=True)
-
 
     if not df_summary.empty:
         write_data_to_sheet('daily_summary', df_summary, mode='replace')
         st.toast("✅ Daily summaries recalculated successfully!", icon="✅")
         
     return df_summary
+
+# def recalculate_all_summaries(initial_balance=2283.22):
+#     """
+#     Reads the full trade history, recalculates daily summaries, and updates the sheet.
+#     This function is run after every trade or deposit entry.
+#     """
+#     if not SHEET_ID: return pd.DataFrame()
+    
+#     today_date = datetime.now(CENTRAL_TZ).date()
+#     today_date_str = today_date.strftime("%Y-%m-%d")
+
+#     df_trades = get_data_from_sheet('trades')
+    
+#     if df_trades.empty or df_trades.shape[0] == 0:
+#         summary_data = {
+#             'Date': [today_date_str],
+#             'Week': [f'Wk {today_date.isocalendar()[1]}'],
+#             'Trades': [0],
+#             'Start Bal.': [initial_balance],
+#             'Target P&L': [initial_balance * 0.04],
+#             'Actual P&L': [0.0],
+#             'Deposit/Bonus': [0.0],
+#             'End Bal.': [initial_balance],
+#         }
+#         df_summary = pd.DataFrame(summary_data)
+#         write_data_to_sheet('daily_summary', df_summary, mode='replace')
+#         return df_summary
+
+#     try:
+#         df_trades['trade_date'] = pd.to_datetime(df_trades['trade_date'], errors='coerce').dt.date.fillna(pd.NaT).ffill()
+#         df_trades['pnl'] = pd.to_numeric(df_trades['pnl'], errors='coerce').fillna(0)
+#     except Exception as e:
+#         st.error(f"Error processing trade data types: {e}.")
+#         return pd.DataFrame()
+
+#     df_trades = df_trades.sort_values(by='trade_date')
+#     daily_groups = df_trades.groupby('trade_date')
+
+#     daily_summary_list = []
+#     current_balance = initial_balance
+    
+#     for date, group in daily_groups:
+#         total_pl = group['pnl'].sum()
+#         num_trades = group.shape[0]
+        
+#         start_balance = current_balance
+#         end_balance = start_balance + total_pl
+#         target_pl = start_balance * 0.04
+#         if start_balance <= 0: target_pl = 0
+        
+#         week_num = datetime.combine(date, datetime.min.time()).isocalendar()[1]
+             
+#         daily_summary_list.append({
+#             'Date': date.strftime("%Y-%m-%d"),
+#             'Week': f'Wk {week_num}',
+#             'Trades': num_trades,
+#             'Start Bal.': round(start_balance, 2),
+#             'Target P&L': round(target_pl, 2),
+#             'Actual P&L': round(total_pl, 2),
+#             'Deposit/Bonus': 0.00,
+#             'End Bal.': round(end_balance, 2),
+#         })
+#         current_balance = end_balance 
+
+#     df_summary = pd.DataFrame(daily_summary_list)
+#     df_summary['Date'] = df_summary['Date'].astype(str)
+    
+#     df_old_summary = get_data_from_sheet('daily_summary')
+#     if not df_old_summary.empty:
+#         df_old_summary['Date'] = pd.to_datetime(df_old_summary['Date'], errors='coerce').dt.date.astype(str)
+#         df_summary['Date'] = pd.to_datetime(df_summary['Date'], errors='coerce').dt.date.astype(str)
+        
+#         df_merged = pd.merge(df_summary, df_old_summary[['Date', 'Deposit/Bonus']], on='Date', how='left', suffixes=('_new', '_old'))
+        
+#         df_merged['Deposit/Bonus'] = pd.to_numeric(df_merged['Deposit/Bonus_old'], errors='coerce').fillna(0.00)
+        
+#         df_summary = df_merged[['Date', 'Week', 'Trades', 'Start Bal.', 'Target P&L', 'Actual P&L', 'Deposit/Bonus', 'End Bal.']]
+        
+#         current_balance_recalc = initial_balance
+#         new_summary_list = []
+#         for index, row in df_summary.iterrows():
+#             deposit = row['Deposit/Bonus']
+#             actual_pl = row['Actual P&L'] 
+#             start_balance = current_balance_recalc
+#             end_balance = start_balance + actual_pl + deposit 
+#             target_pl = start_balance * 0.04
+#             if start_balance <= 0:
+#                  target_pl = 0
+            
+#             new_summary_list.append({
+#                 'Date': row['Date'],
+#                 'Week': row['Week'],
+#                 'Trades': row['Trades'],
+#                 'Start Bal.': round(start_balance, 2),
+#                 'Target P&L': round(target_pl, 2),
+#                 'Actual P&L': round(actual_pl, 2),
+#                 'Deposit/Bonus': round(deposit, 2),
+#                 'End Bal.': round(end_balance, 2),
+#             })
+#             current_balance_recalc = end_balance 
+        
+#         df_summary = pd.DataFrame(new_summary_list)
+#         df_summary['Date'] = df_summary['Date'].astype(str)
+        
+#     if not df_summary.empty:
+#         last_recorded_date_str = df_summary['Date'].iloc[-1]
+        
+#         if last_recorded_date_str != today_date_str:
+            
+#             last_end_bal = df_summary['End Bal.'].iloc[-1]
+#             today_start_bal = last_end_bal
+#             today_target_pl = today_start_bal * 0.04
+            
+#             new_row = pd.DataFrame([{
+#                 'Date': today_date_str,
+#                 'Week': f'Wk {today_date.isocalendar()[1]}',
+#                 'Trades': 0,
+#                 'Start Bal.': round(today_start_bal, 2),
+#                 'Target P&L': round(today_target_pl, 2),
+#                 'Actual P&L': 0.0,
+#                 'Deposit/Bonus': 0.0,
+#                 'End Bal.': round(today_start_bal, 2),
+#             }])
+            
+#             df_summary = pd.concat([df_summary, new_row], ignore_index=True)
+
+
+#     if not df_summary.empty:
+#         write_data_to_sheet('daily_summary', df_summary, mode='replace')
+#         st.toast("✅ Daily summaries recalculated successfully!", icon="✅")
+        
+#     return df_summary
 
 # --- Data Loading and Caching ---
 
